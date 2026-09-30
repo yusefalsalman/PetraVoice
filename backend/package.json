@@ -1,0 +1,28 @@
+{
+  "name": "petravoice-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PetraVoice API — voice ride parsing (Whisper + LLM), cascading geocoding, OSRM routing, fares.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node --watch --disable-warning=ExperimentalWarning src/server.ts",
+    "start": "node --disable-warning=ExperimentalWarning src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "multer": "^2.4.0",
+    "openai": "^7.25.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^26.6.3",
+    "typescript": "^7.0.2"
+  }
+}
