@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+/* PetraVoice theme — light, Petra Ride navy as the single accent (mic + confirm), soft blue tints. */
+:root {
+  --pv-bg: #f1f5f9; /* slate-100 */
+  --pv-surface: #ffffff;
+  --pv-surface-2: #eff6ff; /* blue-50 "water" tint */
+  --pv-border: #e2e8f0; /* slate-200 */
+  --pv-text: #0f172a; /* slate-900 */
+  --pv-muted: #64748b; /* slate-500 */
+  --pv-accent: #00174b; /* Petra Ride navy */
+  --pv-accent-ink: #ffffff;
+  --pv-sky: #2563eb; /* route line, focus rings */
+  --pv-pickup: #10b981;
+  --pv-danger: #dc2626;
+
+  color-scheme: light;
+}
+
+/* Expose the variables as Tailwind utilities: bg-bg, bg-surface, text-fg, text-muted, bg-accent, ... */
+@theme inline {
+  --color-bg: var(--pv-bg);
+  --color-surface: var(--pv-surface);
+  --color-surface-2: var(--pv-surface-2);
+  --color-border: var(--pv-border);
+  --color-fg: var(--pv-text);
+  --color-muted: var(--pv-muted);
+  --color-accent: var(--pv-accent);
+  --color-accent-ink: var(--pv-accent-ink);
+  --color-sky: var(--pv-sky);
+  --color-pickup: var(--pv-pickup);
+  --color-danger: var(--pv-danger);
+  --font-sans: "Tajawal", system-ui, "Segoe UI", Tahoma, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--pv-bg);
+  color: var(--pv-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Map ---- */
+.leaflet-container {
+  background: #e5eef7;
+  font-family: var(--font-sans);
+}
+
+/* Slightly softer standard OSM tiles so pins and the route stand out. */
+.leaflet-tile-pane {
+  filter: saturate(0.75) brightness(1.03);
+}
+
+.leaflet-control-attribution {
+  font-size: 10px;
+}
+
+.pv-pin {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  border: 4px solid #fff;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 0.35);
+}
+
+.pv-pin--pickup {
+  background: var(--pv-pickup);
+}
+
+.pv-pin--dropoff {
+  background: var(--pv-accent);
+  border-radius: 6px;
+}
