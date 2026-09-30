@@ -42,6 +42,8 @@ interface RideState {
   rideType: RideType
   /** The ride type the fare estimate was computed for. */
   parsedRideType: RideType
+  /** The rider picked a card by hand — keep it when edited locations are re-resolved. */
+  rideTypeManual: boolean
   fareEstimate: FareEstimate | null
   route: Route | null
   options: DisambiguationOption[]
@@ -71,6 +73,7 @@ const initial = {
   dropoff: null,
   rideType: 'economy' as RideType,
   parsedRideType: 'economy' as RideType,
+  rideTypeManual: false,
   fareEstimate: null,
   route: null,
   options: [],
@@ -102,7 +105,11 @@ let stopSilenceWatch: (() => void) | undefined
 let requestId = 0
 
 export const useRideStore = create<RideState>()((set, get) => {
-  function apply(res: ParseRideSuccess) {
+  /**
+   * @param keepManualRideType re-resolving edited locations: the request text has no ride words,
+   *   so a card the rider picked by hand wins over the response's default.
+   */
+  function apply(res: ParseRideSuccess, keepManualRideType = false) {
     // No pickup named (and none to choose between) → the rider's current location.
     const pickupAsked = res.options.some((o) => o.field === 'pickup')
     const pickup = res.pickup ?? (pickupAsked ? null : { ...CURRENT_LOCATION, confidence: 1 })
@@ -110,7 +117,8 @@ export const useRideStore = create<RideState>()((set, get) => {
       transcript: res.transcript,
       pickup,
       dropoff: res.dropoff,
-      rideType: res.rideType,
+      // A spoken ride type («سيارة عائلية») pre-selects its card; the rider can still change it.
+      rideType: keepManualRideType && get().rideTypeManual ? get().rideType : res.rideType,
       parsedRideType: res.rideType,
       fareEstimate: res.fareEstimate,
       route: res.route ?? null,
@@ -137,7 +145,7 @@ export const useRideStore = create<RideState>()((set, get) => {
     set({ resolving: true, error: null })
     const res = await parseRide({ text })
     if (id !== requestId) return
-    if (res.success) apply(res)
+    if (res.success) apply(res, true)
     else set({ resolving: false, error: res.error })
   }
 
@@ -212,7 +220,7 @@ export const useRideStore = create<RideState>()((set, get) => {
       if (pickup && dropoff) await refresh(composeText(pickup.name, dropoff.name))
     },
 
-    setRideType: (rideType) => set({ rideType }),
+    setRideType: (rideType) => set({ rideType, rideTypeManual: true }),
 
     confirm: async () => {
       const { pickup, dropoff, rideType, submitting, resolving } = get()

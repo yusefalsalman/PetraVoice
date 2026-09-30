@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { Loader2, LocateFixed, RefreshCw, Search } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { placeName, useLang, useT, type Lang } from '../lib/i18n'
-import { isCurrentLocation } from '../lib/location'
+import { isCurrentLocation, splitNotes } from '../lib/location'
 import { useRideStore, type Field } from '../store/useRideStore'
 import type { Place } from '../types/api'
 import { MicIconButton } from './MicButton'
@@ -31,15 +31,20 @@ interface RowProps {
   trailing?: ReactNode
 }
 
-/** One editable location line: marker + text input + confidence badge. */
+/** Landmark part of a place name in the UI language, without any « • gate» note. */
+const mainText = (name: string, lang: Lang) => placeName(splitNotes(name).main, lang)
+
+/** One editable location line: marker + text input + confidence badge (+ gate note underneath). */
 export default function LocationRow({ field, value, place, onChange, disabled, trailing }: RowProps) {
   const t = useT()
   const lang = useLang((s) => s.lang)
   const isPickup = field === 'pickup'
-  // Badge only while the text still matches what was resolved.
-  const showBadge = place && !isCurrentLocation(place.name) && value.trim() === placeName(place.name, lang)
+  // Badge and note only while the text still matches what was resolved.
+  const resolved = place && !isCurrentLocation(place.name) && value.trim() === mainText(place.name, lang) ? place : null
+  const notes = resolved ? splitNotes(resolved.name).notes : null
 
   return (
+    <div>
     <label className="flex min-h-12 items-center gap-3">
       {isPickup ? (
         // Green GPS mark: an empty pickup means "my current location".
@@ -58,9 +63,16 @@ export default function LocationRow({ field, value, place, onChange, disabled, t
           isPickup ? 'placeholder:text-pickup' : 'placeholder:text-muted/80'
         }`}
       />
-      {showBadge && <ConfidenceBadge value={place.confidence} />}
+      {resolved && <ConfidenceBadge value={resolved.confidence} />}
       {trailing}
     </label>
+      {/* Gate / entrance the rider said («بوابة 2») — kept out of the map search, shown here. */}
+      {notes && (
+        <p className="-mt-2 truncate pb-1.5 ps-7 text-xs text-muted">
+          {mainText(resolved!.name, lang)} • <span className="font-medium text-accent">{notes}</span>
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -82,7 +94,7 @@ function useTypewriter(target: string | null): string | null {
 function fieldText(p: Place | null, fallback: string, lang: Lang, field: Field): string {
   if (!p) return placeName(fallback, lang)
   if (field === 'pickup' && isCurrentLocation(p.name)) return ''
-  return placeName(p.name, lang)
+  return mainText(p.name, lang)
 }
 
 /**
@@ -115,7 +127,7 @@ export function LocationCard() {
   }
 
   // Freshly resolved destinations "type themselves" into the field.
-  const typing = useTypewriter(dropoff ? placeName(dropoff.name, lang) : null)
+  const typing = useTypewriter(dropoff ? mainText(dropoff.name, lang) : null)
   const recording = status === 'recording'
   const busy = resolving || status === 'processing'
   const dirty =
@@ -123,9 +135,16 @@ export function LocationCard() {
     texts.dropoff.trim() !== fieldText(dropoff, '', lang, 'dropoff')
   const hasResult = status === 'confirming'
 
+  // A side the rider didn't touch keeps its gate note when the other side is re-resolved.
+  const withNotes = (field: Field, place: Place | null) => {
+    const text = texts[field].trim()
+    const notes = place ? splitNotes(place.name).notes : null
+    return notes && text === fieldText(place, '', lang, field) ? `${text} ${notes}` : text
+  }
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (dirty && !busy) void resolveNames(texts.pickup, texts.dropoff)
+    if (dirty && !busy) void resolveNames(withNotes('pickup', pickup), withNotes('dropoff', dropoff))
   }
 
   return (

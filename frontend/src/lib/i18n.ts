@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { RideType } from '../types/api'
+import { NOTES_SEPARATOR, splitNotes } from './location'
 
 // UI copy only. Place names and backend error messages come from the API and are
 // shown as received; the API contract ({ pickup, dropoff }) is the same in both languages.
@@ -241,7 +242,10 @@ const PLACE_NAMES_EN: Record<string, string> = {
 
 /** Name to show for a place in the current language. */
 export function placeName(name: string, lang: Lang): string {
-  return lang === 'en' ? (PLACE_NAMES_EN[name] ?? name) : name
+  // Translate the landmark only; a gate note after « • » stays as the rider said it.
+  const { main, notes } = splitNotes(name)
+  const shown = lang === 'en' ? (PLACE_NAMES_EN[main] ?? main) : main
+  return notes ? `${shown}${NOTES_SEPARATOR}${notes}` : shown
 }
 
 /** Popular destinations, shown and sent in the UI language. */

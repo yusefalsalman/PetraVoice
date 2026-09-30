@@ -7,6 +7,7 @@ try {
 }
 
 const env = (key: string, fallback: string) => process.env[key]?.trim() || fallback
+const optional = (value: string) => (value === 'none' ? null : value)
 
 // AI provider: Groq (OpenAI-compatible API) when GROQ_API_KEY is set, otherwise OpenAI.
 const groqKey = process.env.GROQ_API_KEY?.trim() || null
@@ -26,6 +27,8 @@ export const config = {
     baseURL: groqKey ? env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1') : undefined,
     /** Extracts pickup / dropoff from the transcript. */
     llmModel: groqKey ? env('GROQ_MODEL', 'openai/gpt-oss-120b') : env('OPENAI_MODEL', 'gpt-5.4-mini'),
+    /** Tried when the main model is rate-limited (Groq limits are per model). "none" disables. */
+    llmFallbackModel: groqKey ? optional(env('GROQ_FALLBACK_MODEL', 'openai/gpt-oss-20b')) : optional(env('OPENAI_FALLBACK_MODEL', 'none')),
     /** Speech-to-text. */
     sttModel: groqKey ? env('GROQ_STT_MODEL', 'whisper-large-v3') : env('OPENAI_STT_MODEL', 'whisper-1'),
     /** "auto" (default) detects Arabic / English from the audio; "ar" / "en" force one. */

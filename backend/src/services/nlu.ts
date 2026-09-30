@@ -1,7 +1,7 @@
 import { config } from '../config.ts'
 import { RIDE_TYPES, type RideType } from '../contract.ts'
 import { AMBIGUOUS_TERMS, LANDMARKS } from '../data/landmarks.ts'
-import { normalizeArabic } from '../lib/text.ts'
+import { editDistance, normalizeArabic } from '../lib/text.ts'
 import type { Lang, PlaceQuery } from './geocode.ts'
 import { ai } from './openai.ts'
 
@@ -16,6 +16,19 @@ export interface Extraction {
   pickup: PlaceQuery | null
   dropoff: PlaceQuery | null
   rideType: RideType | null
+}
+
+// Known speech-to-text mishearings, fixed before any parsing (so the rule-based fallback
+// benefits too). Keep them specific: «ورد» alone is a real word (flowers).
+const STT_FIXES: [RegExp, string][] = [
+  [/(^|\s)(?:ورد|دور|دوّار)\s+(?:ال)?جندي(?=\s|$|[،,.])/g, '$1دوار الجندي'],
+  [/(^|\s)(?:ورد|دور)\s+(?:ال)?(واحة|واحه|دلة|دله|داخلية|داخليه|سابع|ثامن|خامس|سادس|رابع)(?=\s|$|[،,.])/g, '$1دوار ال$2'],
+  [/الأمير فاسل|الامير فاسل/g, 'الأمير فيصل'],
+]
+
+/** Applies the known speech-to-text fixes; returns the text unchanged if none match. */
+export function correctTranscript(transcript: string): string {
+  return STT_FIXES.reduce((t, [pattern, fix]) => t.replace(pattern, fix), transcript)
 }
 
 /** Script-based guess, used by the fallback parser and to sanity-check the LLM. */
@@ -81,15 +94,24 @@ Set "language" to the language the rider mostly used ("ar" or "en"). Write each 
 2) CLEAN NAME vs NOTES
 "name" is only the searchable landmark. Gates, entrances, sides and sub-directions go in "detail":
 - «دوار الواحة جهة تلاع العلي» → name «دوار الواحة», detail «جهة تلاع العلي»
-- "City Mall gate 3" → name "City Mall", detail "Gate 3"; "Queen Alia Airport, gate 2" → name "Queen Alia International Airport", detail "Gate 2"
+- «مكة مول بوابة 2» → name «مكة مول», detail «بوابة 2»; «مستشفى الخالدي المدخل الرئيسي» → detail «المدخل الرئيسي»
+- "City Mall gate 3" → name "City Mall", detail "Gate 3"; "Queen Alia Airport, gate 2" → name "Queen Alia International Airport", detail "Gate 2"; "terminal 1" → detail "Terminal 1"
 
 3) FIX SPEECH-TO-TEXT MISTAKES
-Correct obvious phonetic errors to the real Jordanian place:
+Transcripts come from speech recognition and contain acoustic mishearings. If a word sounds like a known
+Jordanian circle, monument, hospital or university, map it to that landmark — never drop it:
+- «دوار» is often heard as «ورد» or «دور»: «ورد جندي» / «دور جندي» → «دوار الجندي»; «ورد الواحة» → «دوار الواحة».
 - «مستشفى الأمير فاسل» → «مستشفى الأمير فيصل»; «الخالدى» → «مستشفى الخالدي»; «العبدلى» → «العبدلي».
 - Nicknames: «التكنو» / «التكنولوجيا» → «جامعة العلوم والتكنولوجيا الأردنية»; «البوليفارد» → «العبدلي بوليفارد»; «السابع» → «الدوار السابع»; «البلد» → «وسط البلد»; «الأردنية» → «الجامعة الأردنية»; "Citadel" → "Amman Citadel"; "the airport" → "Queen Alia International Airport".
 - Vague category fitting several places (just «الجامعة» / «المول» / "the university" / "the mall") → name is exactly that word; don't pick one.
 
-4) SEARCH CANDIDATES (for OpenStreetMap, which often lacks colloquial names)
+4) AREA THE RIDER SAID
+If the rider names a neighbourhood / district / city with the place («مجمع بنك الإسكان بالشميساني»، «في مرج الحمام»، "in Abdoun"):
+- put it in "area", spelled canonically («الشميساني» not «شمساني»), and
+- attach it to EVERY search candidate: ["مجمع بنك الإسكان الشميساني عمان", "بنك الإسكان الشميساني", "Housing Bank Complex Shmeisani Amman", "الشميساني عمان"].
+- Never give a bare search for a name that has branches in many places (banks, supermarkets, pharmacies, clinics, restaurants chains, schools, «كارفور», «سامح مول»…) — always attach the area; if none was said, attach «عمان».
+
+5) SEARCH CANDIDATES (for OpenStreetMap, which often lacks colloquial names)
 Give up to 4 queries per place, in this priority order:
   a) the full name; b) the official English OSM name — ALWAYS for hospitals, universities, malls, hotels and
   other facilities, since many exist on OSM only in English; c) a keyword variant with the city; d) the area anchor.
@@ -104,8 +126,10 @@ Examples:
 - Always include the name in the other language when you know it, e.g. «جامعة الطفيلة» → "Tafila Technical University".
 "area" is the neighbourhood / district / city to fall back to if the exact spot isn't on the map. Unknown → "".
 
-5) RIDE TYPE
-"xl" for family / big car / van / 5+ people, "comfort" for a comfortable or nicer car, "economy" if they ask for the cheapest; otherwise "none".`
+6) RIDE TYPE (only if the rider asked for one — otherwise "none")
+- "xl": family / big car / lots of luggage / 5+ people — «عائلية»، «للعيلة»، «سيارة كبيرة»، «باص»، «فان»، «معي شناتي»، «ست أشخاص»، "family", "XL", "van", "luggage", "6 people".
+- "comfort": a nicer car — «مريحة»، «فخمة»، «كومفورت»، «VIP»، "comfort", "luxury", "premium".
+- "economy": explicitly cheap / small / normal — «صغيرة»، «رخيصة»، «عادي»، «اقتصادي»، "economy", "cheapest".`
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() && v.trim().toLowerCase() !== 'null' ? v.trim() : null)
 
@@ -119,9 +143,9 @@ function toPlaceQuery(raw: unknown): PlaceQuery | null {
   return { name, detail: text(p.detail), candidates, area: text(p.area) }
 }
 
-async function extractWithLlm(transcript: string): Promise<Extraction> {
+async function extractWithLlm(transcript: string, model = config.ai.llmModel): Promise<Extraction> {
   const completion = await ai!.chat.completions.create({
-    model: config.ai.llmModel,
+    model,
     temperature: 0,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -129,7 +153,11 @@ async function extractWithLlm(transcript: string): Promise<Extraction> {
     ],
     tools: [EXTRACT_TOOL],
     tool_choice: { type: 'function', function: { name: 'extract_ride' } },
-  })
+  },
+    // No SDK auto-retry: a rate-limited model won't recover in seconds — move on to the fallback
+    // model (see extractRideRaw) instead of waiting.
+    { maxRetries: 0, timeout: 12_000 },
+  )
   const call = completion.choices[0]?.message?.tool_calls?.[0]
   if (!call || call.type !== 'function') throw new Error('LLM did not call extract_ride')
   const args = JSON.parse(call.function.arguments) as Record<string, unknown>
@@ -172,13 +200,18 @@ function findMentions(t: string): Mention[] {
 const PICKUP_CUE =
   /(?:^|\s)(?:من|عند|انا في|انا ب|انا بال|موجود في|موجود عند|from|pick me up|pick me up from|pick me up at|pickup from|(?:i m|im|i am)(?: currently| now)? (?:at|near|in))\s*$/
 const DROPOFF_CUE =
-  /(?:^|\s)(?:الي|علي|ع|لعند|اروح|اروح علي|وصلني|وصلني علي|روحني|بدي|to|towards|drop me off at|drop me at|drop off at|drop me off|heading|heading to|heading towards|going to)\s*$|(?:^|\s)ل$/
+  /(?:^|\s)(?:الي|علي|ع|لعند|اروح|اروح علي|وصلني|وصلني علي|روحني|بدي|to|towards|drop me off at|drop me at|drop off at|drop me off|heading|heading to|heading towards|going to)\s*$|(?:^|\s)ل\s*$/
 
-function roleOf(t: string, m: Mention): 'pickup' | 'dropoff' | null {
+// «…دوار الدلة في مرج الحمام» / «…بالشميساني» / "… in Abdoun": the place right after is the
+// previous place's area, not a pickup or dropoff. (Checked after the pickup cue «انا بـ».)
+const AREA_CUE = /(?:^|\S\s+)(?:في|ب|بـ|in)\s*$|\S\s+ب$/
+
+function roleOf(t: string, m: Mention): 'pickup' | 'dropoff' | 'area' | null {
   const before = t.slice(0, m.start)
   // Dropoff first: "drop me off at" ends in "at" like the pickup cue "I'm at".
   if (DROPOFF_CUE.test(before)) return 'dropoff'
   if (PICKUP_CUE.test(before)) return 'pickup'
+  if (AREA_CUE.test(before)) return 'area'
   return null
 }
 
@@ -188,7 +221,8 @@ const FROM_PHRASE = /(?:^|\s)(?:من|انا عند|أنا عند|انا في|أ�
 const TO_PHRASE_EN = /(?:^|\s)(?:to|towards|drop me off at|drop me at)\s+(.+?)(?=\s+(?:from|and|i['’]?m|i am)\s|[,.]|$)/i
 const FROM_PHRASE_EN = /(?:^|\s)(?:from|pick me up (?:from|at)|i['’]?m (?:currently )?at|i am (?:currently )?at)\s+(.+?)(?=\s+(?:to|towards|and|heading|drop)\s|[,.]|$)/i
 // «دوار الدلة في مرج الحمام» → place «دوار الدلة», area «مرج الحمام».
-const IN_AREA = /^(.+?)\s+(?:في|ب|بـ)\s+(.+)$/
+// Also the attached form «مجمع بنك الإسكان بالشميساني» (ب + ال…).
+const IN_AREA = /^(.+?)\s+(?:(?:في|ب|بـ)\s+|ب(?=ال))(.+)$/
 const FILLER = /\s+(?:لو سمحت|بليز|يا غالي|الله يخليك|بسرعة|please(?: hurry)?|hurry|thanks|bro|man)$/i
 
 function freeText(transcript: string, pattern: RegExp, other: string | null): string | null {
@@ -199,22 +233,41 @@ function freeText(transcript: string, pattern: RegExp, other: string | null): st
   return phrase
 }
 
-const asQuery = (phrase: string | null): PlaceQuery | null => {
-  if (!phrase) return null
-  const inArea = phrase.match(IN_AREA)
-  return inArea
-    ? { name: inArea[1].trim(), detail: null, candidates: [`${inArea[1].trim()} ${inArea[2].trim()}`], area: inArea[2].trim() }
-    : { name: phrase, detail: null, candidates: [], area: null }
+// «…بوابة 2» / «…البوابة الشمالية» / "… gate 3" / "terminal 1": notes, not part of the searched name.
+const DETAIL = /\s*[,،]?\s*((?:ال)?(?:بوابه|بوابة|مدخل|مخرج|جهة|جهه|طابق)\s+\S+|(?:gate|entrance|terminal|exit|door|floor)\s+\S+)\s*$/i
+
+/** Splits a trailing gate / entrance note off a place phrase. */
+function splitDetail(phrase: string): { name: string; detail: string | null } {
+  const m = phrase.match(DETAIL)
+  if (!m || m.index === undefined || m.index === 0) return { name: phrase, detail: null }
+  const detail = m[1].replace(/^(gate|entrance|terminal|exit|door|floor)/i, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase())
+  return { name: phrase.slice(0, m.index).trim(), detail }
 }
 
-function detectRideType(t: string): RideType | null {
-  if (/xl|عائلي|عيله|كبيره|فان|van|family/.test(t)) return 'xl'
-  if (/مريح|كومفورت|comfort/.test(t)) return 'comfort'
-  return null
+const asQuery = (phrase: string | null): PlaceQuery | null => {
+  if (!phrase) return null
+  const { name, detail } = splitDetail(phrase)
+  const inArea = name.match(IN_AREA)
+  return inArea
+    ? { name: inArea[1].trim(), detail, candidates: [`${inArea[1].trim()} ${inArea[2].trim()}`], area: inArea[2].trim() }
+    : { name, detail, candidates: [], area: null }
+}
+
+// Ride-type words (normalised: ة→ه, أ→ا). Checked XL → comfort → economy; "none said" → null.
+const RIDE_WORDS: [RideType, RegExp][] = [
+  ['xl', /(?:^|\s)(?:\S*عائلي\S*|\S*عيله\S*|للعيله|سياره كبيره|كبيره|باص|فان|شناتي|شنط|(?:5|6|7|خمس|ست|سبع)ه? (?:اشخاص|ركاب|انفار)|xl|family|van|luggage|bags|[5-7] (?:people|persons|passengers))(?:\s|$)/],
+  ['comfort', /(?:^|\s)(?:مريحه|مريح|فخمه|فخم|كومفورت|vip|comfort|luxury|premium)(?:\s|$)/],
+  ['economy', /(?:^|\s)(?:صغيره|رخيصه|ارخص|عادي|عاديه|اقتصادي|economy|cheap|cheapest|standard)(?:\s|$)/],
+]
+
+export function detectRideType(t: string): RideType | null {
+  const text = normalizeArabic(t)
+  return RIDE_WORDS.find(([, pattern]) => pattern.test(text))?.[0] ?? null
 }
 
 export function extractWithRules(transcript: string): Extraction {
-  const t = normalizeArabic(transcript)
+  // «للمطار» is «ل» + «المطار» merged — split it so «المطار» is found and «ل» reads as "to".
+  const t = normalizeArabic(transcript).replace(/(^|\s)لل(?=\S{3,})/g, '$1ل ال')
   const mentions = findMentions(t).slice(0, 2)
   let pickup: string | null = null
   let dropoff: string | null = null
@@ -222,6 +275,7 @@ export function extractWithRules(transcript: string): Extraction {
 
   for (const m of mentions) {
     const role = roleOf(t, m)
+    if (role === 'area') continue // «في مرج الحمام» describes the other place
     if (role === 'pickup' && !pickup) pickup = m.name
     else if (role === 'dropoff' && !dropoff) dropoff = m.name
     else unassigned.push(m)
@@ -242,22 +296,117 @@ export function extractWithRules(transcript: string): Extraction {
   return { language, pickup: asQuery(pickupText), dropoff: asQuery(dropoffText), rideType: detectRideType(t) }
 }
 
+// ---------------------------------------------------------------- Explicit areas
+
+/** «بالشميساني» → «شميساني», «والعبدلي» → «عبدلي»: bare word for comparison. */
+const bareWord = (w: string) => w.replace(/^(?:وبال|بال|وال|لل|ال|ب|و|ل)(?=\S{3,})/, '').replace(/^ال/, '')
+
+/**
+ * Marks an area as explicit when the rider actually said it, and adopts the rider's spelling
+ * (the LLM wrote «شمساني» for «بالشميساني»). Inferred areas stay loose hints.
+ */
+export function withExplicitArea(q: PlaceQuery | null, transcript: string): PlaceQuery | null {
+  if (!q?.area) return q
+  const words = normalizeArabic(transcript).split(' ')
+  const llmWords = q.area.trim().split(/\s+/)
+  const areaWords = llmWords.map((w) => bareWord(normalizeArabic(w)))
+
+  // Multi-word areas («مرج الحمام»): all words present in order, ignoring prepositions / article.
+  const bare = words.map(bareWord)
+  for (let i = 0; i + areaWords.length <= bare.length; i++) {
+    const window = bare.slice(i, i + areaWords.length)
+    const close = window.every((w, k) => w === areaWords[k] || (w.length >= 5 && editDistance(w, areaWords[k], 1) <= 1))
+    if (!close) continue
+    // Rebuild the area without the rider's prepositions («بمرج الحمام» → «مرج الحمام»): keep the
+    // LLM's spelling where it matches, otherwise the rider's word, with the article if either had it.
+    const area = window
+      .map((w, k) => {
+        if (w === areaWords[k]) return llmWords[k]
+        const spokenHadArticle = /^(?:و|ب|ل|ف)?ال/.test(words[i + k])
+        return llmWords[k].startsWith('ال') || spokenHadArticle ? `ال${w}` : w
+      })
+      .join(' ')
+    return { ...q, area, areaExplicit: true }
+  }
+  return { ...q, areaExplicit: false }
+}
+
 // ---------------------------------------------------------------- Public
 
+// Type words say nothing about WHICH place — «دوار» in the transcript doesn't back «دوار X».
+const TYPE_WORDS = new Set(
+  ['دوار', 'ميدان', 'شارع', 'مستشفي', 'مجمع', 'جامعه', 'مول', 'مسجد', 'فندق', 'مطعم', 'مركز', 'دولي', 'عمان', 'الاردن',
+    'circle', 'roundabout', 'street', 'hospital', 'mall', 'university', 'hotel', 'the', 'of', 'international', 'amman', 'jordan'].map(normalizeArabic),
+)
+
+/**
+ * Is this place backed by what the rider said? The LLM may correct spelling and nicknames
+ * («التكنو» → «…التكنولوجيا…», "the airport" → "Queen Alia…"), but it once turned «انا بطبربور»
+ * into Queen Alia Airport. A name sharing no real word (or word prefix) with the transcript is rejected.
+ */
+export function grounded(q: PlaceQuery | null, transcript: string): boolean {
+  if (!q) return true
+  const said = normalizeArabic(transcript).split(' ').map(bareWord).filter((w) => w.length >= 3)
+  const claimed = normalizeArabic(q.name)
+    .split(' ')
+    .map(bareWord)
+    .filter((w) => w.length >= 3 && !TYPE_WORDS.has(w))
+  if (claimed.length === 0) return true // e.g. just «الجامعة» — nothing to contradict
+  return claimed.some((t) =>
+    said.some(
+      (w) =>
+        w === t ||
+        (w.length >= 4 && (t.startsWith(w) || w.startsWith(t))) ||
+        (w.length >= 4 && editDistance(w, t, 1) <= 1),
+    ),
+  )
+}
+
 export async function extractRide(transcript: string): Promise<Extraction> {
+  const ex = await extractRideRaw(transcript)
+  // Cross-check with the rule-based reading of the actual words: replace a side the LLM invented,
+  // and fill a side it missed («انا بطبربور» dropped) when the words clearly name one.
+  let rules: Extraction | null = null
+  for (const side of ['pickup', 'dropoff'] as const) {
+    const current = ex[side]
+    if (current && grounded(current, transcript)) continue
+    rules ??= extractWithRules(transcript)
+    const fromWords = rules[side]
+    const other = ex[side === 'pickup' ? 'dropoff' : 'pickup']
+    const duplicate = fromWords && other && normalizeArabic(fromWords.name) === normalizeArabic(other.name)
+    if (current) console.warn(`[nlu] ${side} «${current.name}» isn't in the transcript — using the rule-based reading`)
+    else if (fromWords && !duplicate) console.warn(`[nlu] LLM missed the ${side}; the words say «${fromWords.name}»`)
+    ex[side] = duplicate ? null : fromWords
+  }
+  return {
+    ...ex,
+    // The LLM sometimes skips the ride type; the keyword list catches «سيارة عائلية» / "luggage".
+    rideType: ex.rideType ?? detectRideType(transcript),
+    pickup: withExplicitArea(ex.pickup, transcript),
+    dropoff: withExplicitArea(ex.dropoff, transcript),
+  }
+}
+
+async function extractRideRaw(transcript: string): Promise<Extraction> {
   if (ai) {
-    // The model occasionally answers in prose instead of calling the tool — one retry fixes it.
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        return await extractWithLlm(transcript)
-      } catch (e) {
-        const message = (e as Error).message
-        const retryable = /did not call a tool|did not call extract_ride|tool_use_failed/i.test(message)
-        if (attempt === 1 && retryable) continue
-        console.error('[nlu] LLM extraction failed, using rule-based fallback:', message)
-        break
+    // Main model first; if it's rate-limited (Groq limits are per model), the fallback model.
+    const models = [config.ai.llmModel, config.ai.llmFallbackModel].filter((m): m is string => Boolean(m))
+    for (const model of models) {
+      // The model occasionally answers in prose instead of calling the tool — one retry fixes it.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          return await extractWithLlm(transcript, model)
+        } catch (e) {
+          const message = (e as Error).message
+          const retryable = /did not call a tool|did not call extract_ride|tool_use_failed/i.test(message)
+          if (attempt === 1 && retryable) continue
+          const rateLimited = /\b429\b|rate limit/i.test(message)
+          console.error(`[nlu] ${model} failed${rateLimited ? ' (rate limit)' : ''}:`, message.slice(0, 160))
+          break
+        }
       }
     }
+    console.error('[nlu] no LLM available — using the rule-based parser')
   }
   return extractWithRules(transcript)
 }

@@ -74,9 +74,14 @@ async function checkModels() {
   try {
     const available = new Set<string>()
     for await (const m of ai.models.list()) available.add(m.id)
-    for (const [role, id] of [['LLM', config.ai.llmModel], ['STT', config.ai.sttModel]] as const) {
-      if (!available.has(id)) {
-        console.warn(`  ⚠ ${role} model "${id}" is not available to this key — ${role === 'LLM' ? 'text falls back to rules' : 'audio will fail'}.`)
+    const models: [string, string | null][] = [
+      ['LLM', config.ai.llmModel],
+      ['LLM fallback', config.ai.llmFallbackModel],
+      ['STT', config.ai.sttModel],
+    ]
+    for (const [role, id] of models) {
+      if (id && !available.has(id)) {
+        console.warn(`  ⚠ ${role} model "${id}" is not available to this key — ${role === 'STT' ? 'audio will fail' : 'text falls back to rules'}.`)
       }
     }
   } catch (e) {

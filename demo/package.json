@@ -1,0 +1,13 @@
+{
+  "name": "petravoice-demo",
+  "private": true,
+  "type": "module",
+  "description": "Demo-day helpers: public HTTPS tunnel (Cloudflare Quick Tunnel) + QR code for the judges.",
+  "scripts": {
+    "tunnel": "node tunnel.js",
+    "qr": "node generate-qr.js"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0"
+  }
+}

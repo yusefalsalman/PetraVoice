@@ -8,7 +8,7 @@ import {
 import { ApiError } from '../errors.ts'
 import { straightLineKm } from '../lib/text.ts'
 import { currentLocation, resolvePlace, type Candidate, type Lang, type PlaceQuery, type Resolution } from '../services/geocode.ts'
-import { extractRide } from '../services/nlu.ts'
+import { correctTranscript, extractRide } from '../services/nlu.ts'
 import { fareFor } from '../services/pricing.ts'
 import { fetchRoute } from '../services/routing.ts'
 import { isSupportedAudio, transcribe } from '../services/stt.ts'
@@ -29,9 +29,17 @@ const upload = multer({
 const toPlace = (c: Candidate): Place => ({ name: c.name, lat: c.lat, lng: c.lng, confidence: c.confidence })
 
 /** "الجامعة الأردنية" + "البوابة الشمالية" → one name, as in the contract's own example. */
+/**
+ * Gate / entrance notes ride along in `name` after « • » («مكة مول • بوابة 2») — the contract has
+ * no notes field. The frontend splits on it to show the note under the landmark; confirm-ride
+ * gets the full string so the driver sees the gate. (« - » is not used: real names contain it.)
+ */
+export const NOTES_SEPARATOR = ' • '
+
 function withDetail(c: Candidate, detail: string | null): Candidate {
+  // Not on the current-location marker: the frontend recognises it by its exact name.
   if (!detail || c.source === 'current' || c.name.includes(detail)) return c
-  return { ...c, name: `${c.name} - ${detail}` }
+  return { ...c, name: `${c.name}${NOTES_SEPARATOR}${detail}` }
 }
 
 async function resolveOrDefault(
@@ -61,6 +69,8 @@ parseRideRouter.post('/parse-ride', upload.single('audio'), async (req, res) => 
   }
 
   // 2. Who goes where (typo-corrected, with search candidates).
+  // Known mishearings («ورد جندي» → «دوار الجندي») are fixed up front; the rider sees the corrected text.
+  transcript = correctTranscript(transcript)
   const ex = await extractRide(transcript)
   const describe = (q: PlaceQuery | null) =>
     q ? `«${q.name}»${q.area ? ` @${q.area}` : ''} [${q.candidates.join(' | ')}]` : '—'

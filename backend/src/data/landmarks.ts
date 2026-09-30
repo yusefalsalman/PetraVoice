@@ -82,9 +82,15 @@ export const LANDMARKS: Landmark[] = [
   { id: 'jordanhosp', name: 'مستشفى الأردن', en: 'Jordan Hospital', aliases: [], lat: 31.9606, lng: 35.8997 },
   { id: 'rainbow', name: 'شارع الرينبو', en: 'Rainbow Street', aliases: ['الرينبو', 'Rainbow St'], lat: 31.9493, lng: 35.9303 },
   { id: 'abdoun', name: 'دوار عبدون', en: 'Abdoun Circle', aliases: ['عبدون', 'Abdoun'], lat: 31.9488, lng: 35.8925 },
-  { id: 'shmeisani', name: 'الشميساني', en: 'Shmeisani', aliases: [], lat: 31.9735, lng: 35.8969 },
+  // District centres (coordinates provided by the team).
+  { id: 'shmeisani', name: 'الشميساني', en: 'Shmeisani', aliases: ['شميساني'], lat: 31.9686, lng: 35.8978 },
   { id: 'khalda', name: 'دوار خلدا', en: 'Khalda Circle', aliases: ['خلدا', 'Khalda'], lat: 31.9947, lng: 35.8303 },
   { id: 'sweifieh', name: 'الصويفية', en: 'Sweifieh', aliases: ['Swefieh'], lat: 31.9584, lng: 35.8639 },
+  { id: 'tabarbour', name: 'طبربور', en: 'Tabarbour', aliases: ['Tabarbor'], lat: 32.0035, lng: 35.918 },
+  { id: 'sweileh', name: 'صويلح', en: 'Sweileh', aliases: ['دوار صويلح', 'Swaileh', 'Sweileh Circle'], lat: 32.0305, lng: 35.8458 },
+  { id: 'marjhamam', name: 'مرج الحمام', en: 'Marj Al-Hamam', aliases: ['Marj al Hamam'], lat: 31.8985, lng: 35.8643 },
+  // Marj Al-Hamam's Dalleh Circle. Zarqa has one too — «…في الزرقاء» is kept there by the area check.
+  { id: 'dalleh', name: 'دوار الدلة', en: 'Al-Dalleh Circle', aliases: ['ميدان الدلة', 'Dalleh Circle'], lat: 31.8985, lng: 35.8643 },
 
   // Universities across Jordan — several exist on OSM only under their English name,
   // so an Arabic Nominatim search can't find them.

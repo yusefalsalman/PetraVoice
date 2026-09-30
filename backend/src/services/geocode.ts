@@ -84,11 +84,13 @@ function resolveFromKnowledgeBase(q: string, lang: Lang): Resolution | null {
   // "مستشفى الاستقلال البوابة الشرقية" → contains a known alias. Short aliases must be whole words.
   // But «مستشفى الجامعة الأردنية» is the university's *hospital*, not the university: if the
   // leftover words name another facility, it's a different place.
+  // Several aliases inside («دوار الدلة مرج الحمام»)? The one said first is the place; later
+  // ones are usually its area.
   const padded = ` ${q} `
-  const contained = ALIASES.find((a) => {
-    const inside = a.alias.length >= 5 ? q.includes(a.alias) : padded.includes(` ${a.alias} `)
-    return inside && !FACILITY.test(q.replace(a.alias, ' '))
-  })
+  const position = (a: AliasRow) => (a.alias.length >= 5 ? q.indexOf(a.alias) : padded.indexOf(` ${a.alias} `))
+  const contained = ALIASES.filter((a) => position(a) >= 0 && !FACILITY.test(q.replace(a.alias, ' '))).sort(
+    (a, b) => position(a) - position(b) || b.alias.length - a.alias.length,
+  )[0]
   if (contained) return { kind: 'found', place: kbCandidate(contained, 0.85, lang) }
 
   return null
@@ -263,6 +265,26 @@ function sharesWord(query: string, hitName: string): boolean {
   return significantTokens(query).some((t) => hit.has(t))
 }
 
+// Kinds of place. «حديقة بنك الإسكان» (a park) is not «مجمع بنك الإسكان» (an office complex),
+// even though the names share words.
+const PLACE_TYPES = [
+  ['مجمع', 'complex'], ['حديقه', 'park', 'garden'], ['مستشفي', 'hospital'], ['مدرسه', 'school'], ['مسجد', 'جامع', 'mosque'],
+  ['فندق', 'hotel'], ['مطعم', 'restaurant'], ['شارع', 'street'], ['دوار', 'ميدان', 'circle', 'roundabout', 'square'],
+  ['جامعه', 'university'], ['مول', 'mall'], ['عياده', 'clinic'], ['صيدليه', 'pharmacy'], ['ملعب', 'stadium'], ['جسر', 'bridge'],
+].map((group) => group.map(normalizeArabic))
+
+const typesOf = (s: string) => {
+  const words = new Set(normalizeArabic(s).split(' ').map((w) => w.replace(/^ال/, '')))
+  return new Set(PLACE_TYPES.flatMap((group, i) => (group.some((t) => words.has(t)) ? [i] : [])))
+}
+
+/** A fuzzy hit of a different kind of place than the rider asked for is a different place. */
+function sameKind(query: string, hitName: string): boolean {
+  const asked = typesOf(query)
+  const found = typesOf(hitName)
+  return [...found].every((t) => asked.has(t)) || asked.size === 0
+}
+
 // ---------------------------------------------------------------- Public
 
 export const currentLocation = (): Candidate => ({ ...CURRENT_LOCATION, confidence: 1, source: 'current' })
@@ -279,6 +301,8 @@ export interface PlaceQuery {
   candidates: string[]
   /** Neighbourhood / district to fall back to, e.g. «مرج الحمام». */
   area: string | null
+  /** True when the rider actually said the area («…بالشميساني») rather than the LLM inferring it. */
+  areaExplicit?: boolean
 }
 
 // Confidence by how the place was found. Nothing found by the cascade goes below 0.75,
@@ -302,8 +326,15 @@ const uniqueBy = (list: string[]) => {
   })
 }
 
-/** A match further than this from the area the rider named («في مرج الحمام») is a different place. */
-const AREA_RADIUS_KM = 12
+// A match further than this from the area is a different place («مجمع بنك الإسكان» exists in
+// Zarqa too). Areas the rider actually said are enforced tightly; LLM-inferred ones loosely,
+// since the model sometimes guesses a neighbouring area.
+const RADIUS_KM = { explicitNeighbourhood: 6, explicitCity: 15, inferred: 12 }
+const CITIES = ['عمان', 'الزرقاء', 'الرصيفة', 'إربد', 'اربد', 'العقبة', 'السلط', 'مادبا', 'الكرك', 'المفرق', 'جرش', 'عجلون', 'معان', 'الطفيلة', 'Amman', 'Zarqa', 'Irbid', 'Aqaba', 'Salt', 'Madaba', 'Karak', 'Mafraq', 'Jerash', 'Ajloun', "Ma'an", 'Tafila'].map(normalizeArabic)
+const AMMAN_CENTER: Candidate = { name: 'عمان', lat: 31.9539, lng: 35.9106, confidence: 0.75, source: 'kb' }
+
+/** «شمساني» / «الشميساني»: try the area as said and with / without the article. */
+const areaSpellings = (area: string) => uniqueBy([area, area.startsWith('ال') ? area.slice(2) : `ال${area}`])
 
 /**
  * Cascading resolver:
@@ -321,7 +352,19 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
     return { kind: 'found', place: currentLocation() }
   }
 
-  const queries = uniqueBy([q.name, ...q.candidates])
+  // With an area the rider said, search "<place> <area>" first; the bare name (which may be a
+  // branch in another city) only comes after, and must still land inside the area.
+  const queries =
+    q.area && q.areaExplicit
+      ? uniqueBy([
+          `${q.name} ${q.area}`,
+          ...q.candidates.filter((c) => normalizeArabic(c).includes(normalizeArabic(q.area!))),
+          q.name,
+          ...q.candidates,
+        ])
+      : uniqueBy([q.name, ...q.candidates])
+  const isCity = q.area ? CITIES.includes(normalizeArabic(q.area)) : false
+  const radiusKm = q.areaExplicit ? (isCity ? RADIUS_KM.explicitCity : RADIUS_KM.explicitNeighbourhood) : RADIUS_KM.inferred
 
   let budget = MAX_NOMINATIM_QUERIES
   const tryNominatim = async (name: string, confidence: number, allowAmbiguous = false) => {
@@ -342,16 +385,25 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
     if (areaCenter !== undefined) return areaCenter
     areaCenter = null
     if (!q.area) return null
+    for (const spelling of areaSpellings(q.area)) {
+      const local = resolveFromKnowledgeBase(normalizeArabic(spelling), lang)
+      if (local?.kind === 'found') return (areaCenter = local.place)
+    }
+    // District lookup: «مرج الحمام عمان» first (most districts are in Amman), then Jordan-wide.
     const r =
-      resolveFromKnowledgeBase(normalizeArabic(q.area), lang) ??
+      (!isCity ? await tryNominatim(`${q.area} ${lang === 'en' ? 'Amman' : 'عمان'}`, CONFIDENCE.area) : null) ??
       (await tryNominatim(`${q.area} ${lang === 'en' ? 'Jordan' : 'الأردن'}`, CONFIDENCE.area)) ??
       (await tryNominatim(q.area, CONFIDENCE.area))
     if (r?.kind === 'found') areaCenter = r.place
+    // The rider named an area we can't place: assume it's in Amman rather than accepting anything.
+    else if (q.areaExplicit && !isCity) areaCenter = AMMAN_CENTER
     return areaCenter
   }
   const inArea = async (c: Candidate) => {
     const center = await getAreaCenter()
-    return !center || straightLineKm(center, c) <= AREA_RADIUS_KM
+    if (!center) return true
+    const limit = center === AMMAN_CENTER ? RADIUS_KM.explicitCity : radiusKm
+    return straightLineKm(center, c) <= limit
   }
 
   const approximate = (c: Candidate): Candidate => ({
@@ -377,7 +429,12 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
       return fits.length === 2 ? r : null
     }
     if (r.kind !== 'found' || !(await inArea(r.place))) return null
-    return isAreaLevel(r.place) ? { kind: 'found', place: approximate(r.place) } : r
+    if (!isAreaLevel(r.place)) return r
+    // Only the district was found: pin its curated centre (landmark list) when we have one,
+    // rather than wherever OSM happens to put the district label.
+    const center = await getAreaCenter()
+    const pin = center && center !== AMMAN_CENTER && center.source === 'kb' ? { ...r.place, lat: center.lat, lng: center.lng } : r.place
+    return { kind: 'found', place: approximate(pin) }
   }
 
   // L1 — local landmark KB, instant. Only trusted for the rider's own name, or for candidates
@@ -387,7 +444,19 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
   for (const [i, name] of queries.entries()) {
     const local = resolveFromKnowledgeBase(normalizeArabic(name), lang)
     if (!local) continue
-    const trusted = i === 0 || sharesWord(name, q.name)
+    // Same-named landmark in a different area than the rider said («دوار الدلة في الزرقاء» is not
+    // Marj Al-Hamam's) — keep searching.
+    if (q.areaExplicit && local.kind === 'found' && !(await inArea(local.place))) continue
+    // The rider's own name matching a landmark (even with a typo, «دوار الواهة») IS that landmark —
+    // unless what matched is just the area («دوار الاتصالات مرج الحمام» → «مرج الحمام»).
+    if (i === 0) {
+      const isJustTheArea =
+        local.kind === 'found' && q.area !== null && normalizeArabic(local.place.name) === normalizeArabic(q.area)
+      if (!isJustTheArea) return local
+      areaFallback ??= local.place
+      continue
+    }
+    const trusted = sharesWord(name, q.name)
     if (local.kind === 'found' && (!trusted || isAreaLevel(local.place))) {
       areaFallback ??= local.place
       continue
@@ -409,12 +478,18 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
   const variants = uniqueBy([`${q.name} ${city}`, `${stripped} ${city}`, `${q.name} ${country}`]).filter(
     (v) => !queries.some((x) => normalizeArabic(x) === normalizeArabic(v)),
   )
+  const fullName = normalizeArabic(q.name)
   for (const v of variants) {
     const r = await tryNominatim(v, CONFIDENCE.variant)
     const ok = r && (await accept(r))
-    if (ok?.kind === 'found') {
-      return ok.place.confidence === CONFIDENCE.area ? ok : { kind: 'found', place: { ...ok.place, name: q.name } }
-    }
+    if (ok?.kind !== 'found') continue
+    if (ok.place.confidence === CONFIDENCE.area) return ok
+    // Found only after dropping «دوار» / "Circle": it may be a different place that shares the
+    // word («شارع الجندي» for «دوار الجندي»). Say what was found, and mark it approximate.
+    const hit = normalizeArabic(ok.place.name)
+    if (hit.includes(fullName) || fullName.includes(hit)) return { kind: 'found', place: { ...ok.place, name: q.name } }
+    const near = lang === 'en' ? `near ${ok.place.name} - approximate` : `قرب ${ok.place.name} - موقع تقريبي`
+    return { kind: 'found', place: { ...ok.place, name: `${q.name} (${near})`, confidence: CONFIDENCE.area } }
   }
 
   // L3b — Photon fuzzy search over every query in parallel (it has no 1 req/s policy like
@@ -430,7 +505,18 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
   )
   for (const [i, hits] of photonHits.entries()) {
     for (const h of hits) {
-      if (!sharesWord(queries[i], h.name)) continue
+      if (!sharesWord(queries[i], h.name) || !sameKind(q.name, h.name)) continue
+      // Asked for a «مجمع» but found a plain «بنك الإسكان» (a branch): close, but not the place.
+      const missingKind = [...typesOf(q.name)].some((t) => !typesOf(h.name).has(t))
+      if (missingKind) {
+        const near = lang === 'en' ? `near ${h.name} - approximate` : `قرب ${h.name} - موقع تقريبي`
+        const ok = await accept({
+          kind: 'found',
+          place: { name: `${q.name} (${near})`, lat: h.lat, lng: h.lng, confidence: CONFIDENCE.area, source: 'nominatim' },
+        })
+        if (ok) return ok
+        continue
+      }
       const named = hasArabic(h.name) === (lang === 'ar') ? h.name : q.name
       const ok = await accept({
         kind: 'found',
@@ -440,10 +526,12 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
     }
   }
 
-  // L4 — broader area centre, clearly labelled as approximate.
+  // L4 — broader area centre, clearly labelled as approximate. The generic Amman centre is only a
+  // filter for areas we couldn't place — never an answer: a pin in Zahran labelled «مرج الحمام»
+  // is worse than asking the rider.
   if (areaFallback) return { kind: 'found', place: approximate(areaFallback) }
   const center = await getAreaCenter()
-  if (center) return { kind: 'found', place: approximate(center) }
+  if (center && center !== AMMAN_CENTER) return { kind: 'found', place: approximate(center) }
   return { kind: 'not_found' }
 }
 

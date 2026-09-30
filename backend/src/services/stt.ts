@@ -1,7 +1,6 @@
 import { toFile } from 'openai'
 import { config } from '../config.ts'
 import { ApiError } from '../errors.ts'
-import { knownPlaceNames } from './geocode.ts'
 import { ai } from './openai.ts'
 
 // Speech-to-text with Whisper (Groq whisper-large-v3, or OpenAI whisper-1).
@@ -28,11 +27,12 @@ export const isSupportedAudio = (mime: string) => baseMime(mime) in EXTENSIONS
 
 // Whisper's `prompt` biases spelling toward local landmark names and phrasing (it does not decide
 // the language — that is detected from the audio). Kept short: Groq caps the prompt at 224 tokens.
-const ARABIC_PROMPT = `طلب مشوار في عمّان باللهجة الأردنية: وصلني من دوار الواحة لمستشفى الاستقلال. ${knownPlaceNames()
-  .slice(0, 8)
-  .join('، ')}.`
-const BILINGUAL_PROMPT =
-  'Ride request in Amman, Jordan: take me from Rainbow Street to City Mall. طلب مشوار في عمّان: وصلني من دوار الواحة لمستشفى الاستقلال.'
+// Local names (and the word «دوار», which Whisper otherwise hears as «ورد» / «دور») bias the decoder.
+const ARABIC_PROMPT =
+  'تطبيق حجز سيارات في الأردن، عمان، الزرقاء، إربد، العقبة، دوار الجندي، دوار الواحة، دوار الدلة، الدوار السابع، مستشفى الجامعة، طبربور، مرج الحمام، صويلح، العبدلي، مكة مول، سيتي مول.'
+// Auto mode: the same Arabic context plus a short English line — the spoken language itself is
+// detected from the audio, so English speech is still transcribed in English.
+const BILINGUAL_PROMPT = `${ARABIC_PROMPT} Ride app in Amman, Jordan: 7th Circle, Abdali Boulevard, City Mall.`
 const ENGLISH_PROMPT = 'Ride request in Amman, Jordan: take me from Rainbow Street to City Mall, Abdali Boulevard, 7th Circle.'
 
 const promptFor = (language: string) => (language === 'ar' ? ARABIC_PROMPT : language === 'en' ? ENGLISH_PROMPT : BILINGUAL_PROMPT)
