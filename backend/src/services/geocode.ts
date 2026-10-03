@@ -11,6 +11,8 @@ export interface Candidate {
   lng: number
   confidence: number
   source: 'current' | 'kb' | 'nominatim'
+  /** Knowledge-base landmark id, when the place came from it — used to look up its gates. */
+  landmarkId?: string
 }
 
 export type Resolution =
@@ -53,6 +55,7 @@ const kbCandidate = (row: AliasRow, confidence: number, lang: Lang): Candidate =
   lng: row.lng,
   confidence,
   source: 'kb',
+  landmarkId: row.id,
 })
 
 function resolveFromKnowledgeBase(q: string, lang: Lang): Resolution | null {

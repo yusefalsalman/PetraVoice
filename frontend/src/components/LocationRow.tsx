@@ -29,13 +29,24 @@ interface RowProps {
   disabled?: boolean
   /** Shown at the end of the row (left in RTL, right in LTR), e.g. the inline mic. */
   trailing?: ReactNode
+  /** Changes when a new result arrives: the pill flashes a navy tint, then settles. */
+  highlightKey?: string | null
 }
+
+/** Dotted connector between the pickup and destination markers. */
+function Dots({ className = '' }: { className?: string }) {
+  return <span className={`w-0 border-s-2 border-dotted border-slate-300 ${className}`} aria-hidden />
+}
+
+// Pill colours as literals: framer-motion interpolates them for the arrival flash.
+const FIELD_BG = '#f9fafb' // --pv-field
+const FLASH_BG = '#dfe5f1' // light Petra navy
 
 /** Landmark part of a place name in the UI language, without any « • gate» note. */
 const mainText = (name: string, lang: Lang) => placeName(splitNotes(name).main, lang)
 
 /** One editable location line: marker + text input + confidence badge (+ gate note underneath). */
-export default function LocationRow({ field, value, place, onChange, disabled, trailing }: RowProps) {
+export default function LocationRow({ field, value, place, onChange, disabled, trailing, highlightKey }: RowProps) {
   const t = useT()
   const lang = useLang((s) => s.lang)
   const isPickup = field === 'pickup'
@@ -44,34 +55,55 @@ export default function LocationRow({ field, value, place, onChange, disabled, t
   const notes = resolved ? splitNotes(resolved.name).notes : null
 
   return (
-    <div>
-    <label className="flex min-h-12 items-center gap-3">
-      {isPickup ? (
-        // Green GPS mark: an empty pickup means "my current location".
-        <LocateFixed className="size-4 shrink-0 text-pickup" strokeWidth={2.5} aria-hidden />
-      ) : (
-        <span className="mx-0.5 size-3 shrink-0 rounded-[3px] bg-accent" aria-hidden />
-      )}
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={isPickup ? t.currentLocation : t.dropoffPlaceholder}
-        aria-label={isPickup ? t.pickupLabel : t.dropoffLabel}
-        disabled={disabled}
-        enterKeyHint="search"
-        className={`min-w-0 flex-1 bg-transparent py-2 font-bold text-fg placeholder:font-medium focus:outline-none disabled:opacity-60 ${
-          isPickup ? 'placeholder:text-pickup' : 'placeholder:text-muted/80'
-        }`}
-      />
-      {resolved && <ConfidenceBadge value={resolved.confidence} />}
-      {trailing}
-    </label>
-      {/* Gate / entrance the rider said («بوابة 2») — kept out of the map search, shown here. */}
-      {notes && (
-        <p className="-mt-2 truncate pb-1.5 ps-7 text-xs text-muted">
-          {mainText(resolved!.name, lang)} • <span className="font-medium text-accent">{notes}</span>
-        </p>
-      )}
+    <div className="flex gap-3">
+      {/* Marker column, lined up with the input line: pickup ⋮ destination. */}
+      <div className="flex w-4 shrink-0 flex-col items-center">
+        {isPickup ? (
+          <>
+            <div className="flex h-12 flex-col items-center justify-end">
+              {/* Green GPS mark: an empty pickup means "my current location". */}
+              <LocateFixed className="mb-1 size-4 text-pickup" strokeWidth={2.5} aria-hidden />
+              <Dots className="h-2.5" />
+            </div>
+            <Dots className="flex-1" />
+          </>
+        ) : (
+          <div className="flex h-12 flex-col items-center">
+            <Dots className="h-[1.1rem]" />
+            <span className="mt-1 size-3 rounded-[3px] bg-accent" aria-hidden />
+          </div>
+        )}
+      </div>
+
+      <motion.div
+        key={highlightKey ?? 'static'}
+        initial={highlightKey ? { backgroundColor: FLASH_BG } : false}
+        animate={{ backgroundColor: FIELD_BG }}
+        transition={{ duration: 1.4, ease: 'easeOut' }}
+        className="min-w-0 flex-1 rounded-xl border border-field-border px-3 transition-[border-color,box-shadow] duration-200 focus-within:border-accent/40 focus-within:shadow-[0_0_0_3px_rgb(0_23_75/0.08)]"
+      >
+        <label className="flex min-h-12 items-center gap-2">
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={isPickup ? t.currentLocation : t.dropoffPlaceholder}
+            aria-label={isPickup ? t.pickupLabel : t.dropoffLabel}
+            disabled={disabled}
+            enterKeyHint="search"
+            className={`min-w-0 flex-1 bg-transparent py-2 text-[15px] font-bold text-fg placeholder:font-medium focus:outline-none disabled:opacity-60 ${
+              isPickup ? 'placeholder:text-pickup' : 'placeholder:text-muted/80'
+            }`}
+          />
+          {resolved && <ConfidenceBadge value={resolved.confidence} />}
+          {trailing}
+        </label>
+        {/* Gate / entrance the rider said («بوابة 2») — kept out of the map search, shown here. */}
+        {notes && (
+          <p className="-mt-1.5 truncate pb-2 text-xs text-muted">
+            {mainText(resolved!.name, lang)} • <span className="font-medium text-accent">{notes}</span>
+          </p>
+        )}
+      </motion.div>
     </div>
   )
 }
@@ -156,39 +188,37 @@ export function LocationCard() {
         onChange={(v) => setTexts((s) => ({ ...s, pickup: v }))}
         disabled={busy || recording}
       />
-      <div className="ms-2 h-2 border-s-2 border-dotted border-border" aria-hidden />
-      {/* Re-keyed per destination so a new result fades in with a soft blue highlight. */}
-      <motion.div
-        key={dropoff?.name ?? 'empty'}
-        initial={dropoff ? { backgroundColor: '#bfdbfe' } : false}
-        animate={{ backgroundColor: '#eff6ff' }}
-        transition={{ duration: 1.4, ease: 'easeOut' }}
-        className="-mx-1.5 rounded-xl py-0.5 pe-1 ps-1.5"
-      >
-        <LocationRow
-          field="dropoff"
-          value={typing ?? texts.dropoff}
-          place={typing === null ? dropoff : null}
-          onChange={(v) => setTexts((s) => ({ ...s, dropoff: v }))}
-          disabled={busy || recording}
-          trailing={
-            // Divider + mic, pinned to the far end of the field.
-            <span className="flex shrink-0 items-center border-s border-sky/20 ps-1">
-              <MicIconButton
-                recording={recording}
-                disabled={busy}
-                onClick={() => void (recording ? stopRecording() : startRecording())}
-              />
-            </span>
-          }
-        />
-      </motion.div>
+      {/* The dotted line continues through the gap between the two pills. */}
+      <div className="flex h-2 gap-3" aria-hidden>
+        <div className="flex w-4 justify-center">
+          <Dots />
+        </div>
+      </div>
+      <LocationRow
+        field="dropoff"
+        value={typing ?? texts.dropoff}
+        place={typing === null ? dropoff : null}
+        onChange={(v) => setTexts((s) => ({ ...s, dropoff: v }))}
+        disabled={busy || recording}
+        // A new destination flashes in.
+        highlightKey={dropoff?.name ?? null}
+        trailing={
+          // Divider + mic, pinned to the far end of the field.
+          <span className="-me-2 flex shrink-0 items-center border-s border-field-border ps-1">
+            <MicIconButton
+              recording={recording}
+              disabled={busy}
+              onClick={() => void (recording ? stopRecording() : startRecording())}
+            />
+          </span>
+        }
+      />
 
       {(dirty || busy) && (
         <button
           type="submit"
           disabled={busy || !texts.dropoff.trim()}
-          className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent font-bold text-accent-ink disabled:opacity-50"
+          className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent font-bold text-accent-ink shadow-md shadow-accent/20 transition hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50"
         >
           {busy ? (
             <Loader2 className="size-4 animate-spin" aria-hidden />

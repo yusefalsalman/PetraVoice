@@ -22,7 +22,8 @@ export interface Extraction {
 // benefits too). Keep them specific: «ورد» alone is a real word (flowers).
 const STT_FIXES: [RegExp, string][] = [
   [/(^|\s)(?:ورد|دور|دوّار)\s+(?:ال)?جندي(?=\s|$|[،,.])/g, '$1دوار الجندي'],
-  [/(^|\s)(?:ورد|دور)\s+(?:ال)?(واحة|واحه|دلة|دله|داخلية|داخليه|سابع|ثامن|خامس|سادس|رابع)(?=\s|$|[،,.])/g, '$1دوار ال$2'],
+  [/(^|\s)(?:ورد|دور)\s+(?:ال)?(واحة|واحه|دلة|دله|داخلية|داخليه|سابع|ثامن|خامس|سادس|رابع|ثالث|ثاني|أول|اول)(?=\s|$|[،,.])/g, '$1دوار ال$2'],
+  [/(^|\s)(?:ورد|دور)\s+صويلح(?=\s|$|[،,.])/g, '$1دوار صويلح'],
   [/الأمير فاسل|الامير فاسل/g, 'الأمير فيصل'],
 ]
 
@@ -43,13 +44,17 @@ export function detectLanguage(transcript: string): Lang {
 const placeSchema = (side: string) => ({
   type: 'object',
   additionalProperties: false,
-  required: ['name', 'detail', 'candidates', 'area'],
+  required: ['name', 'gate', 'candidates', 'area'],
   properties: {
     name: {
       type: 'string',
       description: `The ${side}: clean, typo-corrected landmark name ONLY (no gate / side / filler), in the request's language. "" if not said.`,
     },
-    detail: { type: 'string', description: 'Gate / entrance / side / sub-direction, e.g. "البوابة الشمالية", "Gate 3". "" if none.' },
+    gate: {
+      type: 'string',
+      description:
+        'Gate / entrance / sub-location of the place, in canonical form: "بوابة 2", "البوابة الشمالية", "المدخل الرئيسي", "Gate 2", "Main Gate", "Parking Gate", "Emergency"; or a side such as "جهة تلاع العلي". "" if none.',
+    },
     candidates: {
       type: 'array',
       items: { type: 'string' },
@@ -91,11 +96,22 @@ Set "language" to the language the rider mostly used ("ar" or "en"). Write each 
 - Rider at their current location («هون»، «موقعي»، "here", "my location") or no start given → pickup.name = "". Never invent a place that wasn't said.
 - Ignore fillers and chit-chat in both languages: «يا غالي»، «الله يخليك»، «بسرعة»، «لو سمحت»، "please hurry", "hey man", "bro", "thanks".
 
-2) CLEAN NAME vs NOTES
-"name" is only the searchable landmark. Gates, entrances, sides and sub-directions go in "detail":
-- «دوار الواحة جهة تلاع العلي» → name «دوار الواحة», detail «جهة تلاع العلي»
-- «مكة مول بوابة 2» → name «مكة مول», detail «بوابة 2»; «مستشفى الخالدي المدخل الرئيسي» → detail «المدخل الرئيسي»
-- "City Mall gate 3" → name "City Mall", detail "Gate 3"; "Queen Alia Airport, gate 2" → name "Queen Alia International Airport", detail "Gate 2"; "terminal 1" → detail "Terminal 1"
+2) CLEAN NAME vs GATE
+"name" is only the searchable landmark. Gates, entrances, sides and sub-locations go in "gate" — the app pins the
+exact gate for big landmarks, so never drop one and never leave it inside "name":
+- «مكة مول بوابة 2» / «مكة مول البوابة التانية» → name «مكة مول», gate «بوابة 2» (ordinals as digits: «الأولى» → 1, «التانية» → 2, «التالتة» → 3)
+- «الجامعة الأردنية من بوابة الزراعة» → name «الجامعة الأردنية», gate «بوابة الزراعة»; «البوابة الشمالية للأردنية» → gate «البوابة الشمالية»
+- «سيتي مول من عند الباركينج» → gate «بوابة المواقف»; «مستشفى الجامعة الطوارئ» → name «مستشفى الجامعة الأردنية», gate «الطوارئ»
+- «دوار الواحة جهة تلاع العلي» → name «دوار الواحة», gate «جهة تلاع العلي»
+- "Mecca Mall gate two" → name "Mecca Mall", gate "Gate 2"; "City Mall parking entrance" → gate "Parking Gate"; "UJ main gate" → name "University of Jordan", gate "Main Gate"; "Queen Alia Airport, terminal 1" → gate "Terminal 1"
+
+2b) TRAFFIC CIRCLES ARE PLACES — keep them whole
+A circle is a precise point, not its neighbourhood. Keep «دوار» / "Circle" in the name, and use the canonical form:
+- «دوار صويلح» stays «دوار صويلح» (area «صويلح») — never shorten it to the district «صويلح». Strip only the
+  preposition: «لدوار صويلح» / «عدوار صويلح» / «على دوار صويلح» → «دوار صويلح».
+- Nicknames: «الكيلو» / «دوار الكيلو» / «دوار الحرمين» → «دوار الكيلو» ("Kilo Circle" → "Al-Kilo Circle").
+- Numbered circles: «السابع» / «دوار السابع» / «ع السابع» → «الدوار السابع»; "7th circle" / "seventh circle" → "7th Circle". Same for الأول … الثامن.
+- «دوار المدينة» / «المدينة الرياضية» → «دوار المدينة الرياضية»; «الواحة» → «دوار الواحة».
 
 3) FIX SPEECH-TO-TEXT MISTAKES
 Transcripts come from speech recognition and contain acoustic mishearings. If a word sounds like a known
@@ -140,7 +156,10 @@ function toPlaceQuery(raw: unknown): PlaceQuery | null {
   const candidates = Array.isArray(p.candidates)
     ? p.candidates.map(text).filter((c): c is string => c !== null).slice(0, 4)
     : []
-  return { name, detail: text(p.detail), candidates, area: text(p.area) }
+  // The model sometimes leaves the gate inside the name ("Mecca Mall Gate 2") — split it off.
+  const gate = text(p.gate) ?? text(p.detail)
+  const { name: clean, detail } = gate ? { name, detail: gate } : splitDetail(name)
+  return { name: clean, detail, candidates, area: text(p.area) }
 }
 
 async function extractWithLlm(transcript: string, model = config.ai.llmModel): Promise<Extraction> {
@@ -234,7 +253,15 @@ function freeText(transcript: string, pattern: RegExp, other: string | null): st
 }
 
 // «…بوابة 2» / «…البوابة الشمالية» / "… gate 3" / "terminal 1": notes, not part of the searched name.
-const DETAIL = /\s*[,،]?\s*((?:ال)?(?:بوابه|بوابة|مدخل|مخرج|جهة|جهه|طابق)\s+\S+|(?:gate|entrance|terminal|exit|door|floor)\s+\S+)\s*$/i
+// "parking gate" / "main entrance": English puts the gate word last.
+const NAMED_GATE = /(?:main|front|back|side|north|northern|south|southern|east|west|parking|agriculture|engineering|emergency)\s+(?:gate|entrance)/
+const DETAIL = new RegExp(
+  `\\s*[,،]?\\s*((?:ال)?(?:بوابه|بوابة|باب|مدخل|مخرج|جهة|جهه|طابق)\\s+\\S+|(?:gate|entrance|terminal|exit|door|floor)\\s+\\S+|${NAMED_GATE.source})\\s*$`,
+  'i',
+)
+
+/** A gate phrase right after a landmark, in normalised text. */
+const GATE_AFTER = new RegExp(`^\\s*((?:ال)?(?:بوابه|مدخل|باب)\\s+\\S+|(?:gate|entrance|terminal)\\s+\\S+|${NAMED_GATE.source})`, 'i')
 
 /** Splits a trailing gate / entrance note off a place phrase. */
 function splitDetail(phrase: string): { name: string; detail: string | null } {
@@ -273,18 +300,23 @@ export function extractWithRules(transcript: string): Extraction {
   let dropoff: string | null = null
   const unassigned: Mention[] = []
 
+  // «مكة مول بوابه 2»: keep the gate said right after a known landmark (splitDetail takes it off).
+  const named = (m: Mention) => {
+    const gate = t.slice(m.end).match(GATE_AFTER)?.[1]
+    return gate ? `${m.name} ${gate}` : m.name
+  }
   for (const m of mentions) {
     const role = roleOf(t, m)
     if (role === 'area') continue // «في مرج الحمام» describes the other place
-    if (role === 'pickup' && !pickup) pickup = m.name
-    else if (role === 'dropoff' && !dropoff) dropoff = m.name
+    if (role === 'pickup' && !pickup) pickup = named(m)
+    else if (role === 'dropoff' && !dropoff) dropoff = named(m)
     else unassigned.push(m)
   }
   // No cue: with two places the first is the pickup; a lone place is the destination.
   for (const m of unassigned) {
-    if (!pickup && !dropoff && unassigned.length === 2) pickup = m.name
-    else if (!dropoff) dropoff = m.name
-    else if (!pickup) pickup = m.name
+    if (!pickup && !dropoff && unassigned.length === 2) pickup = named(m)
+    else if (!dropoff) dropoff = named(m)
+    else if (!pickup) pickup = named(m)
   }
 
   // Places we don't know: take the free text after the cue for whichever side is missing.
@@ -339,6 +371,13 @@ const TYPE_WORDS = new Set(
     'circle', 'roundabout', 'street', 'hospital', 'mall', 'university', 'hotel', 'the', 'of', 'international', 'amman', 'jordan'].map(normalizeArabic),
 )
 
+// "Seventh Circle" said, "7th Circle" claimed: the same place. Arabic ordinals («السابع») are
+// spelled the same both ways already.
+const ORDINAL_WORDS: Record<string, string> = {
+  first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th', sixth: '6th', seventh: '7th', eighth: '8th',
+}
+const ordinal = (w: string) => ORDINAL_WORDS[w] ?? w
+
 /**
  * Is this place backed by what the rider said? The LLM may correct spelling and nicknames
  * («التكنو» → «…التكنولوجيا…», "the airport" → "Queen Alia…"), but it once turned «انا بطبربور»
@@ -346,10 +385,11 @@ const TYPE_WORDS = new Set(
  */
 export function grounded(q: PlaceQuery | null, transcript: string): boolean {
   if (!q) return true
-  const said = normalizeArabic(transcript).split(' ').map(bareWord).filter((w) => w.length >= 3)
+  const said = normalizeArabic(transcript).split(' ').map(bareWord).map(ordinal).filter((w) => w.length >= 3)
   const claimed = normalizeArabic(q.name)
     .split(' ')
     .map(bareWord)
+    .map(ordinal)
     .filter((w) => w.length >= 3 && !TYPE_WORDS.has(w))
   if (claimed.length === 0) return true // e.g. just «الجامعة» — nothing to contradict
   return claimed.some((t) =>

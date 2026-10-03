@@ -17,9 +17,11 @@ npm run dev        # http://localhost:5173 (proxies /api → http://localhost:80
   - Recorded audio has no STT in mock mode — it always returns the fixed الواحة → الاستقلال ride.
   - `?mock=ambiguous` — forces the "قصدك؟" two-choice case
   - `?mock=error` — forces an `STT_FAILED` error
-- `VITE_USE_MOCK=false` — real calls to the Laravel API. Restart `npm run dev` after changing it.
+- `VITE_USE_MOCK=false` — real calls to the Node.js backend. Restart `npm run dev` after changing it.
 
 ## Notes
 
-- The microphone only works on `localhost` or HTTPS — opening the dev server from a phone via a LAN IP over plain HTTP will block it. Use the text input ("أو اكتب طلبك") or an HTTPS tunnel for phone demos.
-- Map: OpenStreetMap tiles (darkened with a CSS filter), no API key.
+- The microphone only works on `localhost` or HTTPS — opening the dev server from a phone via a LAN IP over plain HTTP will block it. Type the destination instead, or use the HTTPS tunnel in `../demo` for phone demos.
+- Map: OpenStreetMap tiles (softened with a CSS filter), no API key. Route line and accents use the Petra Ride navy (`--pv-accent` in `src/index.css`).
+- Spoken confirmation (`src/lib/speech.ts`): after a ride is mapped and priced, the app reads it back in the rider's language — server voice from `/api/tts`, falling back to the browser's male voice if it's slow or off. On iOS, sound is unlocked on the first tap (WebKit blocks audio that doesn't start in a tap). The 🔈 button in the header mutes it.
+- Ride-card car images live in `public/cars` (Microsoft Fluent Emoji 3D, MIT — see `LICENSE.txt` there).

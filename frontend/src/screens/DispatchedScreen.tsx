@@ -50,7 +50,7 @@ export default function DispatchedScreen() {
       <button
         type="button"
         onClick={reset}
-        className="min-h-12 w-full rounded-2xl bg-accent font-bold text-accent-ink"
+        className="min-h-12 w-full rounded-2xl bg-accent font-bold text-accent-ink shadow-lg shadow-accent/25 transition hover:bg-accent-hover active:scale-[0.98]"
       >
         {t.newRide}
       </button>

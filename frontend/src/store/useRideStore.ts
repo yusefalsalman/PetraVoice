@@ -3,6 +3,7 @@ import { confirmRide, parseRide } from '../lib/api'
 import { useLang } from '../lib/i18n'
 import { CURRENT_LOCATION, isCurrentLocation } from '../lib/location'
 import { MicError, startRecording, watchSilence, type Recording } from '../lib/recorder'
+import { stopSpeaking } from '../lib/speech'
 import type {
   ConfirmRideSuccess,
   DisambiguationOption,
@@ -55,6 +56,11 @@ interface RideState {
   resolving: boolean
   /** What the user last typed, so the inputs survive a failed lookup. */
   typed: { pickup: string; dropoff: string }
+  /**
+   * Bumped each time a complete ride (both ends + fare) arrives — the confirm screen speaks it.
+   * Not part of `initial`, so resets never make an old value look new.
+   */
+  announce: number
 
   startRecording: () => Promise<void>
   stopRecording: () => Promise<void>
@@ -113,7 +119,10 @@ export const useRideStore = create<RideState>()((set, get) => {
     // No pickup named (and none to choose between) → the rider's current location.
     const pickupAsked = res.options.some((o) => o.field === 'pickup')
     const pickup = res.pickup ?? (pickupAsked ? null : { ...CURRENT_LOCATION, confidence: 1 })
+    const asking = res.needsDisambiguation && res.options.length > 0
+    const complete = !asking && pickup !== null && res.dropoff !== null && res.fareEstimate !== null
     set({
+      announce: complete ? get().announce + 1 : get().announce,
       transcript: res.transcript,
       pickup,
       dropoff: res.dropoff,
@@ -125,7 +134,7 @@ export const useRideStore = create<RideState>()((set, get) => {
       options: res.options,
       error: null,
       resolving: false,
-      status: res.needsDisambiguation && res.options.length > 0 ? 'disambiguating' : 'confirming',
+      status: asking ? 'disambiguating' : 'confirming',
     })
   }
 
@@ -151,9 +160,11 @@ export const useRideStore = create<RideState>()((set, get) => {
 
   return {
     ...initial,
+    announce: 0,
 
     startRecording: async () => {
       if (get().status === 'recording') return
+      stopSpeaking() // the mic must not hear the app talking
       requestId++ // drop any in-flight parse
       set({ ...initial, status: 'recording' })
       try {
@@ -225,6 +236,7 @@ export const useRideStore = create<RideState>()((set, get) => {
     confirm: async () => {
       const { pickup, dropoff, rideType, submitting, resolving } = get()
       if (!pickup || !dropoff || submitting || resolving) return
+      stopSpeaking()
       set({ submitting: true, error: null })
       const res = await confirmRide({
         pickup: { name: pickup.name, lat: pickup.lat, lng: pickup.lng },
@@ -237,6 +249,7 @@ export const useRideStore = create<RideState>()((set, get) => {
 
     reset: () => {
       requestId++
+      stopSpeaking()
       clearTimeout(autoStop)
       stopSilenceWatch?.()
       recording?.cancel()

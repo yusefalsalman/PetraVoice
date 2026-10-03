@@ -1,3 +1,5 @@
+import { JORDAN_CIRCLES } from './geoKnowledge.ts'
+
 // Level-1 geocoding: curated Jordanian landmarks with colloquial and English aliases.
 // Coordinates from OpenStreetMap (Nominatim). `name` / `en` are the canonical names returned
 // to Arabic / English requests. Seeded into SQLite on startup (see db/database.ts).
@@ -11,8 +13,7 @@ export interface Landmark {
   lng: number
 }
 
-export const LANDMARKS: Landmark[] = [
-  { id: 'waha', name: 'دوار الواحة', en: 'Al-Waha Circle', aliases: ['الواحة', 'دوار الواحه', 'Waha Circle'], lat: 31.9871, lng: 35.8712 },
+const PLACES: Landmark[] = [
   { id: 'istiklal', name: 'مستشفى الاستقلال', en: 'Istiklal Hospital', aliases: ['الاستقلال', 'مستشفى الإستقلال'], lat: 31.9945, lng: 35.9102 },
   // On OSM only as "Jordan University Hospital" — Arabic searches find nothing.
   {
@@ -51,9 +52,6 @@ export const LANDMARKS: Landmark[] = [
   { id: 'citymall', name: 'سيتي مول', en: 'City Mall', aliases: [], lat: 31.9805, lng: 35.838 },
   { id: 'mecca', name: 'مكة مول', en: 'Mecca Mall', aliases: ['مكه مول', 'Makkah Mall'], lat: 31.9777, lng: 35.8439 },
   { id: 'taj', name: 'تاج مول', en: 'Taj Mall', aliases: [], lat: 31.9412, lng: 35.8881 },
-  { id: 'fifth', name: 'الدوار الخامس', en: '5th Circle', aliases: ['الخامس', 'دوار الخامس', 'Fifth Circle'], lat: 31.9607, lng: 35.8805 },
-  { id: 'seventh', name: 'الدوار السابع', en: '7th Circle', aliases: ['السابع', 'دوار السابع', 'Seventh Circle'], lat: 31.9594, lng: 35.8576 },
-  { id: 'eighth', name: 'الدوار الثامن', en: '8th Circle', aliases: ['الثامن', 'دوار الثامن', 'Eighth Circle'], lat: 31.957, lng: 35.8471 },
   {
     id: 'roman',
     name: 'المدرج الروماني - وسط البلد',
@@ -78,7 +76,6 @@ export const LANDMARKS: Landmark[] = [
     lat: 31.7238,
     lng: 36.0072,
   },
-  { id: 'sports', name: 'دوار المدينة الرياضية', en: 'Sports City Circle', aliases: ['المدينة الرياضية', 'Sports City'], lat: 31.9854, lng: 35.8976 },
   { id: 'jordanhosp', name: 'مستشفى الأردن', en: 'Jordan Hospital', aliases: [], lat: 31.9606, lng: 35.8997 },
   { id: 'rainbow', name: 'شارع الرينبو', en: 'Rainbow Street', aliases: ['الرينبو', 'Rainbow St'], lat: 31.9493, lng: 35.9303 },
   { id: 'abdoun', name: 'دوار عبدون', en: 'Abdoun Circle', aliases: ['عبدون', 'Abdoun'], lat: 31.9488, lng: 35.8925 },
@@ -87,7 +84,7 @@ export const LANDMARKS: Landmark[] = [
   { id: 'khalda', name: 'دوار خلدا', en: 'Khalda Circle', aliases: ['خلدا', 'Khalda'], lat: 31.9947, lng: 35.8303 },
   { id: 'sweifieh', name: 'الصويفية', en: 'Sweifieh', aliases: ['Swefieh'], lat: 31.9584, lng: 35.8639 },
   { id: 'tabarbour', name: 'طبربور', en: 'Tabarbour', aliases: ['Tabarbor'], lat: 32.0035, lng: 35.918 },
-  { id: 'sweileh', name: 'صويلح', en: 'Sweileh', aliases: ['دوار صويلح', 'Swaileh', 'Sweileh Circle'], lat: 32.0305, lng: 35.8458 },
+  { id: 'sweileh', name: 'صويلح', en: 'Sweileh', aliases: ['Swaileh'], lat: 32.0305, lng: 35.8458 },
   { id: 'marjhamam', name: 'مرج الحمام', en: 'Marj Al-Hamam', aliases: ['Marj al Hamam'], lat: 31.8985, lng: 35.8643 },
   // Marj Al-Hamam's Dalleh Circle. Zarqa has one too — «…في الزرقاء» is kept there by the area check.
   { id: 'dalleh', name: 'دوار الدلة', en: 'Al-Dalleh Circle', aliases: ['ميدان الدلة', 'Dalleh Circle'], lat: 31.8985, lng: 35.8643 },
@@ -105,6 +102,8 @@ export const LANDMARKS: Landmark[] = [
   { id: 'ttu', name: 'جامعة الطفيلة التقنية', en: 'Tafila Technical University', aliases: ['جامعة الطفيلة', 'الطفيلة التقنية'], lat: 30.8397, lng: 35.6442 },
   { id: 'ahu', name: 'جامعة الحسين بن طلال', en: 'Al-Hussein Bin Talal University', aliases: ['الحسين بن طلال'], lat: 30.2594, lng: 35.6843 },
 ]
+
+export const LANDMARKS: Landmark[] = [...PLACES, ...JORDAN_CIRCLES]
 
 /** Vague words that match more than one landmark → the «قصدك؟» choice (exactly two). */
 export const AMBIGUOUS_TERMS: { term: string; ids: [string, string] }[] = [

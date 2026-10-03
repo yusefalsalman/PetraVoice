@@ -12,7 +12,8 @@ interface Point {
 const AMMAN: LatLng = [31.9539, 35.9106]
 const AMMAN_BOUNDS: LatLng[] = [[31.935, 35.86], [31.99, 35.94]]
 // SVG stroke attributes can't read CSS variables — keep in sync with index.css.
-const ROUTE_COLOR = '#2563eb'
+/** Petra Ride navy (--pv-accent) — Leaflet paths need a literal colour. */
+const ROUTE_COLOR = '#00174b'
 
 const pin = (kind: 'pickup' | 'dropoff') =>
   L.divIcon({

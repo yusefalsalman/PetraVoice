@@ -31,9 +31,11 @@ export default function HomeScreen() {
               // Sent in the UI language — the backend understands both and answers in kind.
               onClick={() => void resolveNames('', label[lang])}
               disabled={recording}
-              className="flex min-h-11 items-center gap-1.5 rounded-xl bg-surface px-3 text-start text-sm font-medium ring-1 ring-border hover:bg-surface-2 disabled:opacity-50"
+              className="group flex min-h-11 items-center gap-2 rounded-full border border-field-border bg-surface px-3 text-start text-sm font-semibold text-fg transition hover:border-accent/30 hover:bg-surface-2 active:scale-[0.98] disabled:opacity-50"
             >
-              <MapPin className="size-4 shrink-0 text-sky" aria-hidden />
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent/10 text-accent transition group-hover:bg-accent group-hover:text-accent-ink">
+                <MapPin className="size-3.5" strokeWidth={2.4} aria-hidden />
+              </span>
               <span className="truncate">{label[lang]}</span>
             </button>
           ))}

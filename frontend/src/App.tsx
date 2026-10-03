@@ -6,9 +6,11 @@ import {
   useMotionValue,
   type PanInfo,
 } from 'framer-motion'
+import { Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import MapPreview from './components/MapPreview'
 import { useLang, useT } from './lib/i18n'
+import { useVoice } from './lib/speech'
 import ConfirmScreen from './screens/ConfirmScreen'
 import DisambiguationScreen from './screens/DisambiguationScreen'
 import DispatchedScreen from './screens/DispatchedScreen'
@@ -45,6 +47,8 @@ export default function App() {
   const t = useT()
   const lang = useLang((s) => s.lang)
   const setLang = useLang((s) => s.setLang)
+  const muted = useVoice((s) => s.muted)
+  const toggleVoice = useVoice((s) => s.toggle)
 
   const sheetRef = useRef<HTMLElement>(null)
   const [sheetHeight, setSheetHeight] = useState(0)
@@ -121,6 +125,17 @@ export default function App() {
               </button>
             ))}
           </div>
+          {/* Spoken ride confirmation on / off. */}
+          <button
+            type="button"
+            onClick={toggleVoice}
+            aria-pressed={!muted}
+            aria-label={muted ? t.voiceOn : t.voiceOff}
+            title={muted ? t.voiceOn : t.voiceOff}
+            className="pointer-events-auto flex size-11 items-center justify-center rounded-full bg-surface/95 text-muted shadow-md ring-1 ring-border backdrop-blur transition hover:text-fg"
+          >
+            {muted ? <VolumeX className="size-5" aria-hidden /> : <Volume2 className="size-5 text-accent" aria-hidden />}
+          </button>
         </header>
       </div>
 

@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
-/* PetraVoice theme — light, Petra Ride navy as the single accent (mic + confirm), soft blue tints. */
+/* PetraVoice theme — light, Petra Ride navy (from the logo) as the single brand colour. */
 :root {
   --pv-bg: #f1f5f9; /* slate-100 */
   --pv-surface: #ffffff;
-  --pv-surface-2: #eff6ff; /* blue-50 "water" tint */
+  --pv-surface-2: #eef1f7; /* navy-tinted panel (active ride card, fare) */
+  --pv-field: #f9fafb; /* gray-50 input pills */
+  --pv-field-border: #e5e7eb; /* gray-200 */
   --pv-border: #e2e8f0; /* slate-200 */
   --pv-text: #0f172a; /* slate-900 */
   --pv-muted: #64748b; /* slate-500 */
   --pv-accent: #00174b; /* Petra Ride navy */
+  --pv-accent-hover: #0b1b3d; /* deeper navy for hover / pressed */
   --pv-accent-ink: #ffffff;
-  --pv-sky: #2563eb; /* route line, focus rings */
   --pv-pickup: #10b981;
   --pv-danger: #dc2626;
 
@@ -22,12 +24,14 @@
   --color-bg: var(--pv-bg);
   --color-surface: var(--pv-surface);
   --color-surface-2: var(--pv-surface-2);
+  --color-field: var(--pv-field);
+  --color-field-border: var(--pv-field-border);
   --color-border: var(--pv-border);
   --color-fg: var(--pv-text);
   --color-muted: var(--pv-muted);
   --color-accent: var(--pv-accent);
+  --color-accent-hover: var(--pv-accent-hover);
   --color-accent-ink: var(--pv-accent-ink);
-  --color-sky: var(--pv-sky);
   --color-pickup: var(--pv-pickup);
   --color-danger: var(--pv-danger);
   --font-sans: "Tajawal", system-ui, "Segoe UI", Tahoma, sans-serif;

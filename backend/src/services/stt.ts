@@ -37,6 +37,31 @@ const ENGLISH_PROMPT = 'Ride request in Amman, Jordan: take me from Rainbow Stre
 
 const promptFor = (language: string) => (language === 'ar' ? ARABIC_PROMPT : language === 'en' ? ENGLISH_PROMPT : BILINGUAL_PROMPT)
 
+const ARABIC = /[؀-ۿ]/g
+const LATIN = /[A-Za-z]/g
+const count = (s: string, script: RegExp) => (s.match(script) ?? []).length
+
+/**
+ * Whisper sometimes appends a translation of what was said («وديني من جامعة الإسراء…. I'm going
+ * from Isra'a University to…»), so the app would answer in the wrong language. Keep only the
+ * sentences in the language it heard; English place names inside an Arabic sentence stay.
+ */
+export function keepSpokenLanguage(text: string, detected?: string): string {
+  const sentences = text.split(/(?<=[.!?؟])\s+/).filter(Boolean)
+  if (sentences.length < 2) return text
+  const lang = detected?.toLowerCase()
+  const spoken: RegExp =
+    lang === 'arabic' || lang === 'ar' ? ARABIC
+    : lang === 'english' || lang === 'en' ? LATIN
+    // No language reported: the first sentence is what the rider said.
+    : count(sentences[0], ARABIC) >= count(sentences[0], LATIN) ? ARABIC : LATIN
+  const other = spoken === ARABIC ? LATIN : ARABIC
+  const kept = sentences.filter((s) => count(s, spoken) >= count(s, other))
+  if (kept.length === 0 || kept.length === sentences.length) return text
+  console.log(`[stt] dropped ${sentences.length - kept.length} sentence(s) not in the spoken language (${lang ?? 'guessed'})`)
+  return kept.join(' ')
+}
+
 export async function transcribe(audio: Buffer, mimeType: string): Promise<string> {
   if (!ai) {
     console.error('[stt] no GROQ_API_KEY / OPENAI_API_KEY set — cannot transcribe audio')
@@ -52,8 +77,10 @@ export async function transcribe(audio: Buffer, mimeType: string): Promise<strin
       // "auto": no `language` — Whisper detects Arabic or English from the audio.
       ...(config.ai.sttLanguage === 'auto' ? {} : { language: config.ai.sttLanguage }),
       prompt: promptFor(config.ai.sttLanguage),
+      // verbose_json also returns the language Whisper detected from the audio.
+      response_format: 'verbose_json',
     })
-    const text = result.text.trim()
+    const text = keepSpokenLanguage(result.text.trim(), result.language)
     if (!text) throw new ApiError('STT_FAILED')
     return text
   } catch (e) {

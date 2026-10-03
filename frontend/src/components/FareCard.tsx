@@ -16,7 +16,7 @@ export default function FareCard({ fare, route, loading }: Props) {
   if (loading) return <div className="h-[72px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3 ring-1 ring-sky/10">
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3 ring-1 ring-accent/10">
       <div>
         <p className="text-xs text-muted">{t.fareTitle}</p>
         {fare ? (

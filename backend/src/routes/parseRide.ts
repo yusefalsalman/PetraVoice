@@ -5,6 +5,7 @@ import {
   type ParseRideSuccess,
   type Place,
 } from '../contract.ts'
+import { findGate, GATED_LANDMARKS } from '../data/geoKnowledge.ts'
 import { ApiError } from '../errors.ts'
 import { straightLineKm } from '../lib/text.ts'
 import { currentLocation, resolvePlace, type Candidate, type Lang, type PlaceQuery, type Resolution } from '../services/geocode.ts'
@@ -28,7 +29,6 @@ const upload = multer({
 
 const toPlace = (c: Candidate): Place => ({ name: c.name, lat: c.lat, lng: c.lng, confidence: c.confidence })
 
-/** "الجامعة الأردنية" + "البوابة الشمالية" → one name, as in the contract's own example. */
 /**
  * Gate / entrance notes ride along in `name` after « • » («مكة مول • بوابة 2») — the contract has
  * no notes field. The frontend splits on it to show the note under the landmark; confirm-ride
@@ -36,9 +36,31 @@ const toPlace = (c: Candidate): Place => ({ name: c.name, lat: c.lat, lng: c.lng
  */
 export const NOTES_SEPARATOR = ' • '
 
-function withDetail(c: Candidate, detail: string | null): Candidate {
+/** A known gate of a known landmark: exact road-side pin. */
+const GATE_CONFIDENCE = 0.97
+
+/**
+ * Attaches the gate / entrance the rider named. For landmarks with mapped gates
+ * (data/geoKnowledge.ts) the pin moves to that gate — «مكة مول • بوابة 2» at Gate 2, not the roof.
+ * Otherwise the note rides along in the name at the landmark's own pin.
+ */
+function withGate(c: Candidate, detail: string | null, lang: Lang): Candidate {
   // Not on the current-location marker: the frontend recognises it by its exact name.
-  if (!detail || c.source === 'current' || c.name.includes(detail)) return c
+  if (!detail || c.source === 'current') return c
+  const gated = c.landmarkId ? GATED_LANDMARKS[c.landmarkId] : undefined
+  // Approximate matches (area fallbacks) keep their label: there's no sure landmark to gate.
+  if (gated && c.confidence > 0.75) {
+    const base = lang === 'en' ? gated.en : gated.ar
+    const found = findGate(c.landmarkId!, detail)
+    if (found) {
+      const label = lang === 'en' ? found.gate.en : found.gate.ar
+      console.log(`[gate] ${base} → ${found.gate.en} (${found.gate.lat}, ${found.gate.lng})`)
+      return { ...c, name: `${base}${NOTES_SEPARATOR}${label}`, lat: found.gate.lat, lng: found.gate.lng, confidence: GATE_CONFIDENCE }
+    }
+    // Unmapped gate («بوابة الهندسة»): landmark pin, the rider's gate as the note.
+    return { ...c, name: `${base}${NOTES_SEPARATOR}${detail}` }
+  }
+  if (c.name.includes(detail)) return c
   return { ...c, name: `${c.name}${NOTES_SEPARATOR}${detail}` }
 }
 
@@ -73,7 +95,7 @@ parseRideRouter.post('/parse-ride', upload.single('audio'), async (req, res) => 
   transcript = correctTranscript(transcript)
   const ex = await extractRide(transcript)
   const describe = (q: PlaceQuery | null) =>
-    q ? `«${q.name}»${q.area ? ` @${q.area}` : ''} [${q.candidates.join(' | ')}]` : '—'
+    q ? `«${q.name}»${q.detail ? ` #${q.detail}` : ''}${q.area ? ` @${q.area}` : ''} [${q.candidates.join(' | ')}]` : '—'
   console.log(`[nlu] ${ex.language} pickup=${describe(ex.pickup)} dropoff=${describe(ex.dropoff)}`)
 
   // 3. Geocode both ends in parallel through the cascade. No pickup said → current location.
@@ -88,8 +110,8 @@ parseRideRouter.post('/parse-ride', upload.single('audio'), async (req, res) => 
   }
 
   const rideType = ex.rideType ?? 'economy'
-  const pickup = pickupRes?.kind === 'found' ? withDetail(pickupRes.place, ex.pickup?.detail ?? null) : null
-  const dropoff = dropoffRes?.kind === 'found' ? withDetail(dropoffRes.place, ex.dropoff?.detail ?? null) : null
+  const pickup = pickupRes?.kind === 'found' ? withGate(pickupRes.place, ex.pickup?.detail ?? null, ex.language) : null
+  const dropoff = dropoffRes?.kind === 'found' ? withGate(dropoffRes.place, ex.dropoff?.detail ?? null, ex.language) : null
 
   // 4. Ambiguous → exactly two options for one field (dropoff first), no fare yet.
   const ambiguous =

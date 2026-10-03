@@ -5,6 +5,7 @@ import { config } from './config.ts'
 import { ApiError, errorBody } from './errors.ts'
 import { confirmRideRouter } from './routes/confirmRide.ts'
 import { parseRideRouter } from './routes/parseRide.ts'
+import { ttsRouter, ttsStatus } from './routes/tts.ts'
 import { ai } from './services/openai.ts'
 
 const app = express()
@@ -29,10 +30,11 @@ app.get('/api/health', (_req, res) => {
     stt: Boolean(config.ai.apiKey),
     sttModel: config.ai.apiKey ? config.ai.sttModel : null,
     llm: config.ai.apiKey ? config.ai.llmModel : 'rules',
+    tts: ttsStatus,
   })
 })
 
-app.use('/api', parseRideRouter, confirmRideRouter)
+app.use('/api', parseRideRouter, confirmRideRouter, ttsRouter)
 
 app.use('/api', (_req, res) => {
   res.status(404).json(errorBody('SERVER_ERROR', 'المسار غير موجود'))
@@ -65,6 +67,7 @@ app.listen(config.port, () => {
       ? `  AI: ${config.ai.provider} — STT ${config.ai.sttModel}, LLM ${config.ai.llmModel}`
       : '  AI: no GROQ_API_KEY / OPENAI_API_KEY — text uses the rule-based parser; audio will return STT_FAILED',
   )
+  console.log(`  TTS: ${ttsStatus === 'browser' ? 'off — the browser speaks the confirmation' : ttsStatus}`)
   void checkModels()
 })
 

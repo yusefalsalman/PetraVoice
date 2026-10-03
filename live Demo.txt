@@ -1,0 +1,26 @@
+"Hey, please take me to Queen Alia International Airport,
+ Terminal 2, and right now I'm waiting in front of Abdali Boulevard."
+ 
+ 
+"Drop me off at Amman Citadel, but pick me up from Rainbow Street near the First Circle."
+
+
+"I need a ride from 7th Circle to City Mall, main gate 3 please."
+
+
+«يسعد مساك، وديني على مستشفى الجامعة الأردنية، وأنا هيني واقف عند دوار الواحة جهة تلاع العلي.»
+
+
+«بدي أطلع من الدوار السابع لعند مكة مول بوابة 2.»
+
+
+
+live Demo: 
+1- cd frontend 
+   npm run dev 
+
+2- cd backend 
+   npm run dev
+
+3- cd demo
+   npm run tunnel

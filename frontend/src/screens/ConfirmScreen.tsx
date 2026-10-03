@@ -1,24 +1,48 @@
-import { AlertCircle, Bus, Car, CarFront, Loader2, type LucideIcon } from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
+import { useEffect } from 'react'
 import FareCard from '../components/FareCard'
 import { LocationCard } from '../components/LocationRow'
 import { fareForTier } from '../lib/fare'
-import { errorText, useT } from '../lib/i18n'
+import { errorText, useLang, useT } from '../lib/i18n'
 import { straightLineKm } from '../lib/location'
+import { confirmationText, speak, speechLang, stopSpeaking } from '../lib/speech'
 import { useRideStore } from '../store/useRideStore'
 import type { RideType } from '../types/api'
 
-const RIDE_TYPES: { id: RideType; seats: number; Icon: LucideIcon }[] = [
-  { id: 'economy', seats: 4, Icon: Car },
-  { id: 'comfort', seats: 4, Icon: CarFront },
-  { id: 'xl', seats: 6, Icon: Bus },
+/** 3D renders in public/cars (Microsoft Fluent Emoji 3D, MIT — see public/cars/LICENSE.txt). */
+const RIDE_TYPES: { id: RideType; seats: number; image: string }[] = [
+  { id: 'economy', seats: 4, image: '/cars/economy.png' }, // silver car
+  { id: 'comfort', seats: 4, image: '/cars/comfort.png' }, // navy car
+  { id: 'xl', seats: 6, image: '/cars/xl.png' }, // family van
 ]
 
 /** Straight lines are shorter than roads — rough city factor for fare estimates without a route. */
 const ROAD_FACTOR = 1.3
+/** Let the map fly to the route and the fare render before the voice starts. */
+const SPEAK_DELAY_MS = 700
+
+/** Speaks each newly arrived ride (route + fare) once, in the language the rider used. */
+function useSpokenConfirmation() {
+  const announce = useRideStore((s) => s.announce)
+  useEffect(() => {
+    if (!announce) return
+    const timer = setTimeout(() => {
+      const s = useRideStore.getState()
+      if (s.status !== 'confirming' || !s.pickup || !s.dropoff) return
+      const fare = fareForTier(s.rideType, s.fareEstimate, s.parsedRideType, null)
+      if (!fare) return
+      const lang = speechLang(s.transcript, useLang.getState().lang)
+      void speak(confirmationText({ pickup: s.pickup, dropoff: s.dropoff, rideType: s.rideType, fare: fare.min }, lang), lang)
+    }, SPEAK_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [announce])
+  useEffect(() => stopSpeaking, [])
+}
 
 export default function ConfirmScreen() {
   const t = useT()
   const s = useRideStore()
+  useSpokenConfirmation()
   const missing = !s.pickup ? t.missingPickup : !s.dropoff ? t.missingDropoff : null
   const canConfirm = !missing && !s.submitting && !s.resolving
 
@@ -41,7 +65,7 @@ export default function ConfirmScreen() {
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-muted">{t.rideTypeLegend}</legend>
         <div className="grid grid-cols-3 gap-2">
-          {RIDE_TYPES.map(({ id, seats, Icon }) => {
+          {RIDE_TYPES.map(({ id, seats, image }) => {
             const active = s.rideType === id
             const fare = fareFor(id)
             return (
@@ -50,11 +74,21 @@ export default function ConfirmScreen() {
                 type="button"
                 onClick={() => s.setRideType(id)}
                 aria-pressed={active}
-                className={`flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl border-2 transition ${
-                  active ? 'border-accent bg-surface-2' : 'border-transparent bg-surface ring-1 ring-border'
+                className={`group flex min-w-0 flex-col items-center gap-0.5 rounded-2xl border-2 px-1.5 pb-2.5 pt-2 transition ${
+                  active ? 'border-accent bg-surface-2' : 'border-transparent bg-surface ring-1 ring-border hover:ring-accent/25'
                 }`}
               >
-                <Icon className={`size-6 ${active ? 'text-accent' : 'text-muted'}`} aria-hidden />
+                <img
+                  src={image}
+                  alt=""
+                  aria-hidden
+                  draggable={false}
+                  width={224}
+                  height={153}
+                  className={`mb-0.5 size-7 object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)] transition-transform duration-200 ${
+                    active ? 'scale-105' : 'opacity-90 group-hover:scale-105'
+                  }`}
+                />
                 <span className="text-sm font-bold">{t.rideTypes[id]}</span>
                 <span className="text-[11px] text-muted">{t.seats(seats)}</span>
                 {fare && !s.resolving && (
@@ -81,7 +115,7 @@ export default function ConfirmScreen() {
         type="button"
         onClick={() => void s.confirm()}
         disabled={!canConfirm}
-        className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-accent text-lg font-bold text-accent-ink shadow-lg shadow-accent/20 transition active:scale-[0.98] disabled:opacity-50"
+        className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-accent text-lg font-bold text-accent-ink shadow-lg shadow-accent/25 transition hover:bg-accent-hover hover:shadow-xl hover:shadow-accent/30 active:scale-[0.98] disabled:opacity-50"
       >
         {s.submitting && <Loader2 className="size-5 animate-spin" aria-hidden />}
         {s.submitting ? t.confirming : t.confirm}

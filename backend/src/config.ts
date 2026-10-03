@@ -35,6 +35,20 @@ export const config = {
     sttLanguage: env('STT_LANGUAGE', 'auto'),
   },
 
+  /**
+   * Spoken ride confirmation (/api/tts).
+   *  "edge" (default): Microsoft Edge's neural voices — no key, same male voice in every browser.
+   *  "openai": OpenAI tts-1 (needs OPENAI_API_KEY).  "none": the browser speaks on its own.
+   */
+  tts: {
+    provider: (['edge', 'openai', 'none'] as const).find((p) => p === env('TTS_PROVIDER', 'edge')) ?? 'edge',
+    voiceAr: env('TTS_VOICE_AR', 'ar-SA-HamedNeural'),
+    voiceEn: env('TTS_VOICE_EN', 'en-US-ChristopherNeural'),
+    openaiKey,
+    openaiModel: env('TTS_MODEL', 'tts-1'),
+    openaiVoice: env('TTS_VOICE', 'onyx'),
+  },
+
   nominatimUrl: env('NOMINATIM_URL', 'https://nominatim.openstreetmap.org'),
   photonUrl: env('PHOTON_URL', 'https://photon.komoot.io'),
   osrmUrl: env('OSRM_URL', 'https://router.project-osrm.org'),
