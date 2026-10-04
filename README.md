@@ -35,7 +35,8 @@
 [Architecture](#%EF%B8%8F-system-architecture) ·
 [Tech Stack](#%EF%B8%8F-tech-stack) ·
 [Getting Started](#-getting-started) ·
-[Live Demo](#-live-demo--tunneling-for-evaluators--judges)
+[Live Demo](#-live-demo--tunneling-for-evaluators--judges) ·
+[Demo Videos](#-demo-videos-fully-automated)
 
 </div>
 
@@ -52,7 +53,8 @@ rider's own language**: «أبشر، جهزتلك رحلة اقتصادية من
 It handles the way people really talk in Amman: **inverted pickup / destination order**, nicknames
 («التكنو», «البوليفارد», «الكيلو»), speech-recognition slips («ورد جندي» → «دوار الجندي»), gates and
 entrances («بوابة 2», «البوابة الشمالية») pinned at the **actual gate**, and spoken ride preferences
-(«سيارة كبيرة للعيلة», "luggage", "VIP").
+(«سيارة كبيرة للعيلة», "luggage", "VIP"). Vague requests («وصلني ع المستشفى») get a spoken **«أي مستشفى؟»**
+with the five best-known options — one tap and the ride is ready.
 
 > [!IMPORTANT]
 > **Safety gate — no automatic booking, ever.** PetraVoice only *prepares* the ride. A trip is created
@@ -141,7 +143,27 @@ Falls back to the browser's own male voice if the server is slow; works on iPhon
 ### 🧪 End-to-End Tested
 `npm run test:e2e` drives the real pipeline — LLM, gate registry, geocoder, OSRM and TTS — through
 realistic Amman requests and checks every pin to the metre:
-gate pickups, nickname circles, current-location rides and English requests, plus valid MP3 audio.
+gate pickups, nickname circles, current-location rides and English requests, «قصدك؟» categories and
+tapped choices, plus valid MP3 audio.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🔀 Smart «قصدك؟» Choices
+Say just a category — «وصلني ع المستشفى», «بدي أروح ع الجامعة», "take me to the mall" — and the app asks
+**«أي مستشفى؟»** out loud and shows the **top 5** places of that kind as cards with their area
+(universities, hospitals, malls, schools). Answered from a local registry: **no map search, no extra LLM
+call**. Tap one (or say it) and the route and fare appear in **under half a second**.
+
+</td>
+<td width="50%" valign="top">
+
+### 🎬 Automated Demo Videos
+One command records the real app end to end — Jordanian voiceover, real spoken requests through the fake
+microphone, Whisper and the LLM — and edits it with FFmpeg: a **1080p landscape** cut, or a
+**1080×1920 vertical** cut with animated Arabic captions, camera zooms and scene fades at 60 fps.
 
 </td>
 </tr>
@@ -160,6 +182,8 @@ flowchart TD
     E --> F["🚕 Ride tier<br/><sub>Economy · Comfort · XL</sub>"]
     E --> G["🚪 Gate & circle registry<br/><sub>exact gate / roundabout pins</sub>"]
     E --> H["📍 Cascading geocoder<br/><sub>Landmark KB → Nominatim → Photon → district</sub>"]
+    H -->|"generic / similar places"| Q["🔀 «قصدك؟» 2–5 choices<br/><sub>spoken question · tap or say one</sub>"]
+    Q -->|"tap → fast path, no LLM"| I
     G & H --> I["🛣️ OSRM route + JOD fare"]
     F & I --> J["✅ Confirmation screen<br/><sub>rider reviews & taps Confirm</sub>"]
     J -->|"POST /api/tts"| L["🔊 Spoken confirmation<br/><sub>Edge neural voice · rider's language</sub>"]
@@ -173,9 +197,11 @@ flowchart TD
 
 Audio (or typed text) → **Whisper** transcript (only the spoken language kept) → known mishearings fixed →
 **LLM** extracts language, pickup, dropoff, gates, ride tier and search candidates → each place is checked
-against the transcript → **gate & circle registry**, then the **cascading geocoder**, resolve coordinates →
-**OSRM** computes the route → fare is priced per tier → the app shows everything, **reads it back aloud**,
-and waits for **manual confirmation**.
+against the transcript → **gate & circle registry**, then the **cascading geocoder**, resolve coordinates
+(a generic category or two similar places → **«قصدك؟»** with 2–5 options; a tapped option comes back as
+«إلى مستشفى الخالدي» and is answered from the registry without the LLM) → **OSRM** computes the route →
+fare is priced per tier → the app shows everything, **reads it back aloud**, and waits for
+**manual confirmation**.
 
 </details>
 
@@ -189,9 +215,9 @@ and waits for **manual confirmation**.
 | **Backend** | Node.js 24 · Express 5 · TypeScript · SQLite (`node:sqlite`) · REST API |
 | **AI / NLU** | Groq **whisper-large-v3** (speech-to-text) · Groq **gpt-oss-120b** with automatic fallback to **gpt-oss-20b** · rule-based parser as a last resort |
 | **Voice Output** | Microsoft Edge neural TTS via `msedge-tts` (`ar-SA-HamedNeural`, `en-US-ChristopherNeural`) · optional OpenAI `tts-1` · Web Speech API fallback |
-| **Geocoding & Routing** | Gate & traffic-circle registry · Local landmark KB · OpenStreetMap **Nominatim** · **Photon** fuzzy search · **OSRM** routing (encoded polyline) |
-| **Testing** | End-to-end pipeline test (`npm run test:e2e`) · TypeScript strict mode |
-| **Demo Infrastructure** | **Cloudflare Quick Tunnels** (`cloudflared`) · QR code CLI (`qrcode-terminal`) |
+| **Geocoding & Routing** | Gate & traffic-circle registry · Generic-category registry (top-5 «قصدك؟») · Local landmark KB · OpenStreetMap **Nominatim** · **Photon** fuzzy search · **OSRM** routing (encoded polyline) |
+| **Testing** | End-to-end pipeline test (`npm run test:e2e`, 7 rides + TTS) · TypeScript strict mode |
+| **Demo Infrastructure** | **Cloudflare Quick Tunnels** (`cloudflared`) · QR code CLI (`qrcode-terminal`) · **Playwright** + **FFmpeg** automated demo videos |
 
 <br />
 
@@ -246,10 +272,20 @@ cd backend
 npm run test:e2e
 ```
 
-Runs realistic requests through the whole pipeline — «بدي سيارة من مكة مول بوابة 2 لدوار صويلح»,
-«وصلني على الجامعة الأردنية البوابة الشمالية», «خذني على دوار الكيلو», an English economy ride — and checks
-every pin against the registry, plus Arabic and English TTS audio. Requests are spaced 15 s apart to stay
-inside Groq's free-tier rate limit.
+Runs realistic requests through the whole pipeline and checks every pin against the registry (within 30 m):
+
+| # | Request | Checks |
+| :-- | :-- | :-- |
+| 1 | «بدي سيارة من مكة مول بوابة 2 لدوار صويلح» | pin on Mecca Mall Gate 2 · «دوار» kept · Sweileh Circle |
+| 2 | «وصلني على الجامعة الأردنية البوابة الشمالية» | current-location pickup · UJ North Gate |
+| 3 | «خذني على دوار الكيلو» | nickname → Kilo (Al-Haramain) Circle |
+| 4 | "I need an economy ride from City Mall to Seventh Circle" | English names · economy · 7th Circle |
+| 5 | «وصلني ع المستشفى» | «قصدك؟» with the 5 hospitals, in order, at their pins · no fare yet |
+| 6 | "take me to the mall" | the 5 malls with English names |
+| 7 | «إلى مستشفى الخالدي» (a tapped option) | fast path (no LLM) · full route and fare |
+| + | `/api/tts` Arabic and English | 200 · valid MP3 audio |
+
+Requests are spaced 15 s apart to stay inside Groq's free-tier rate limit.
 
 <br />
 
@@ -299,18 +335,59 @@ npm run qr -- https://<name>.trycloudflare.com
 
 <br />
 
+## 🎬 Demo Videos (Fully Automated)
+
+With the backend and frontend running, one command produces a finished, narrated video of the real app —
+no screen recorder, no editing:
+
+```bash
+cd demo
+npm run record              # → backend/demo_video_final.mp4           (landscape, 1920×1080)
+npm run record:vertical     # → backend/demo_video_vertical_final.mp4  (vertical 9:16, 1080×1920)
+```
+
+**What happens**
+
+1. **Voiceover** — colloquial Jordanian lines spoken by `ar-JO-TaimNeural` (Edge neural TTS).
+2. **Three real voice bookings** — each request is played into Chromium's fake microphone, so the app hears
+   it through the real pipeline (mic → Whisper → LLM → registry → OSRM):
+   - «يعطيك العافية، بدي سيارة من مكة مول بوابة 2 لدوار صويلح» → pin on **Gate 2** → Sweileh Circle
+   - «بدنا سيارة عائلية من الدوار السابع للمطار، واحنا خمس أشخاص» → **Family XL** picked from speech
+   - «وصلني على الجامعة لو سمحت» → **«أي جامعة؟»** with five choices → الجامعة الأردنية
+3. **Spoken replies** use the **real fare of each run**, said the Jordanian way («دينارين ونص», «ستطعش دينار»).
+4. **Editing (FFmpeg)** — the silence and server waits are cut (~1 minute total); the vertical cut adds
+   Chromium-rendered Arabic captions (Tajawal, Petra navy pills), camera zooms onto the mic, the gate pin and
+   the XL card, soft scene dips and fades, exported at 60 fps.
+
+> [!NOTE]
+> Frames are full-resolution screenshots (headless Chromium can't record sharp *and* fast), so the app's own
+> animations update ~10×/s; camera moves, captions and fades are rendered at the full 60 fps. If Whisper ever
+> mishears a request, that take falls back to typing it, so a video is always produced. ~3–5 minutes and
+> 4 Groq requests per run. Edit the rides, lines and captions in the `RIDES` list at the top of
+> `demo/record-demo.mjs` / `demo/record-vertical.mjs`.
+
+<br />
+
 ## 🗂️ Project Structure
 
 ```
 PetraVoice/
 ├── frontend/     React + Vite mobile UI          →  frontend/README.md
 ├── backend/      Express API, NLU & geocoding    →  backend/README.md
-├── demo/         Cloudflare tunnel + QR code      →  demo/README.md
+├── demo/         Tunnel + QR code, demo-video recorders  →  demo/README.md
 └── CLAUDE.md     Shared API contract (single source of truth)
 ```
 
-Key places to extend: gates & circles in `backend/src/data/geoKnowledge.ts`, other landmarks in
-`backend/src/data/landmarks.ts`, the spoken sentence in `frontend/src/lib/speech.ts`.
+Key places to extend:
+
+| What | Where |
+| :-- | :-- |
+| Gates and traffic circles | `backend/src/data/geoKnowledge.ts` |
+| «قصدك؟» category lists (top 5 per category) | `GENERIC_CATEGORIES` in `backend/src/data/landmarks.ts` |
+| Other landmarks and aliases | `backend/src/data/landmarks.ts` |
+| Spoken sentences (confirmation, «أي مستشفى؟») | `frontend/src/lib/speech.ts` |
+| Area hints under the choice cards | `PLACE_AREAS` in `frontend/src/lib/i18n.ts` |
+| Demo-video rides, voiceover and captions | `demo/record-demo.mjs`, `demo/record-vertical.mjs` |
 
 <sub>Ride-card car images are based on [Microsoft Fluent Emoji 3D](https://github.com/microsoft/fluentui-emoji)
 (MIT) — see `frontend/public/cars/LICENSE.txt`.</sub>

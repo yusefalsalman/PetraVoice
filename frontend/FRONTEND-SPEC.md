@@ -107,7 +107,7 @@ Shows: the transcript as understood, pickup, dropoff, map preview, fare estimate
 - Fit bounds to both markers with padding, and disable scroll-wheel zoom so the page doesn't hijack scrolling on mobile.
 
 ### 4.6 Disambiguation Screen
-Renders exactly two large tappable cards with the Arabic prompt «قصدك؟». Choosing a card fills the field and moves straight to the confirmation screen.
+Renders the 2–5 options as tappable cards (category icon, name, area) under a prompt that names the category when all options share one («أي مستشفى؟», else «قصدك؟»), and speaks the question. Choosing a card fills the field and moves straight to the confirmation screen; the rider can also say the name instead.
 
 ---
 

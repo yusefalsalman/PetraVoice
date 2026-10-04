@@ -17,7 +17,8 @@ export interface Candidate {
 
 export type Resolution =
   | { kind: 'found'; place: Candidate }
-  | { kind: 'ambiguous'; options: [Candidate, Candidate] }
+  /** 2 for two similar map hits; up to 5 for a generic category («الجامعة», «المستشفى»). */
+  | { kind: 'ambiguous'; options: Candidate[] }
   | { kind: 'not_found' }
 
 /** Language of the rider's request — place names are returned in it. */
@@ -64,8 +65,7 @@ function resolveFromKnowledgeBase(q: string, lang: Lang): Resolution | null {
 
   const generic = AMBIGUOUS_TERMS.find((g) => normalizeArabic(g.term) === q)
   if (generic) {
-    const [a, b] = generic.ids.map(landmarkById)
-    return { kind: 'ambiguous', options: [kbCandidate(a, 0.6, lang), kbCandidate(b, 0.6, lang)] }
+    return { kind: 'ambiguous', options: generic.ids.map((id) => kbCandidate(landmarkById(id), 0.6, lang)) }
   }
 
   // Typo-tolerant: «دوار الواهة» / "Mekka Mall" → canonical. Names ≥ 6 letters: 1 off; ≥ 9: 2 off.
@@ -429,7 +429,7 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
       const fits = []
       for (const o of r.options) if (await inArea(o)) fits.push(o)
       if (fits.length === 1) return { kind: 'found', place: { ...fits[0], confidence: CONFIDENCE.candidate } }
-      return fits.length === 2 ? r : null
+      return fits.length >= 2 ? { kind: 'ambiguous', options: fits } : null
     }
     if (r.kind !== 'found' || !(await inArea(r.place))) return null
     if (!isAreaLevel(r.place)) return r

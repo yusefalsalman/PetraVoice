@@ -89,6 +89,19 @@ const PLACES: Landmark[] = [
   // Marj Al-Hamam's Dalleh Circle. Zarqa has one too — «…في الزرقاء» is kept there by the area check.
   { id: 'dalleh', name: 'دوار الدلة', en: 'Al-Dalleh Circle', aliases: ['ميدان الدلة', 'Dalleh Circle'], lat: 31.8985, lng: 35.8643 },
 
+  // Generic-category choices (GENERIC_CATEGORIES below). Coordinates: OSM, checked 2026-10.
+  { id: 'petra-uni', name: 'جامعة البترا', en: 'University of Petra', aliases: ['جامعة البتراء', 'Petra University'], lat: 31.8931, lng: 35.8744 },
+  { id: 'isra', name: 'جامعة الإسراء', en: 'Isra University', aliases: ['الإسراء', 'جامعة الاسراء'], lat: 31.7892, lng: 35.9287 },
+  { id: 'zaytoonah', name: 'جامعة الزيتونة', en: 'Al-Zaytoonah University of Jordan', aliases: ['الزيتونة', 'جامعة الزيتونة الأردنية', 'Zaytoonah University'], lat: 31.8324, lng: 35.8923 },
+  { id: 'khalidi', name: 'مستشفى الخالدي', en: 'Al-Khalidi Hospital', aliases: ['الخالدي', 'Khalidi Hospital'], lat: 31.9519, lng: 35.9031 },
+  { id: 'specialty', name: 'المستشفى التخصصي', en: 'The Specialty Hospital', aliases: ['التخصصي', 'مستشفى التخصصي', 'Specialty Hospital'], lat: 31.9787, lng: 35.9 },
+  // OSM only has the street named after the school (Jabal Amman) — point on that street.
+  { id: 'isc', name: 'مدارس الكلية العلمية الإسلامية', en: 'Islamic Scientific College School', aliases: ['الكلية العلمية الإسلامية', 'الكلية العلمية', 'ISC'], lat: 31.9524, lng: 35.9139 },
+  { id: 'modern-systems', name: 'مدارس النظم الحديثة', en: 'Modern Systems Schools', aliases: ['النظم الحديثة', 'Modern Systems School'], lat: 31.9989, lng: 35.8716 },
+  { id: 'ahliyyah', name: 'المدرسة الأهلية للبنات', en: 'Ahliyyah School for Girls', aliases: ['الأهلية', 'المدارس الأهلية', 'Ahliyyah School'], lat: 31.9484, lng: 35.9297 },
+  { id: 'abdali-mall', name: 'العبدلي مول', en: 'Abdali Mall', aliases: ['The Abdali Mall'], lat: 31.9635, lng: 35.9083 },
+  { id: 'galleria', name: 'جاليريا مول', en: 'Galleria Mall', aliases: ['الجاليريا', 'غاليريا مول'], lat: 31.9593, lng: 35.8623 },
+
   // Universities across Jordan — several exist on OSM only under their English name,
   // so an Arabic Nominatim search can't find them.
   { id: 'psut', name: 'جامعة الأميرة سمية للتكنولوجيا', en: 'Princess Sumaya University for Technology', aliases: ['جامعة الأميرة سمية', 'سمية', 'PSUT'], lat: 32.0231, lng: 35.8768 },
@@ -105,17 +118,39 @@ const PLACES: Landmark[] = [
 
 export const LANDMARKS: Landmark[] = [...PLACES, ...JORDAN_CIRCLES]
 
-/** Vague words that match more than one landmark → the «قصدك؟» choice (exactly two). */
-export const AMBIGUOUS_TERMS: { term: string; ids: [string, string] }[] = [
-  { term: 'الجامعة', ids: ['ju', 'asu'] },
-  { term: 'المول', ids: ['citymall', 'mecca'] },
-  { term: 'مول', ids: ['citymall', 'mecca'] },
-  { term: 'جامعة', ids: ['ju', 'asu'] },
-  { term: 'the university', ids: ['ju', 'asu'] },
-  { term: 'university', ids: ['ju', 'asu'] },
-  { term: 'the mall', ids: ['citymall', 'mecca'] },
-  { term: 'mall', ids: ['citymall', 'mecca'] },
+/**
+ * Generic categories («وصلني ع المستشفى», "take me to the mall") → the «قصدك؟» choice with the
+ * best-known places of that kind, most visited first. Resolved straight from this list — no map
+ * search, no extra LLM call. (Schools: Bishop's, Al-Rowad and Amman Academy aren't on OpenStreetMap
+ * yet — add them here once the team has their coordinates.)
+ */
+export const GENERIC_CATEGORIES: { category: 'university' | 'hospital' | 'school' | 'mall'; terms: string[]; ids: string[] }[] = [
+  {
+    category: 'university',
+    terms: ['الجامعة', 'جامعة', 'جامعه', 'the university', 'university'],
+    ids: ['ju', 'asu', 'petra-uni', 'isra', 'zaytoonah'],
+  },
+  {
+    category: 'hospital',
+    terms: ['المستشفى', 'مستشفى', 'المشفى', 'مشفى', 'the hospital', 'hospital'],
+    ids: ['juh', 'istiklal', 'khalidi', 'specialty', 'jordanhosp'],
+  },
+  {
+    category: 'school',
+    terms: ['المدرسة', 'مدرسة', 'المدارس', 'مدارس', 'the school', 'school'],
+    ids: ['isc', 'modern-systems', 'ahliyyah'],
+  },
+  {
+    category: 'mall',
+    terms: ['المول', 'مول', 'the mall', 'mall'],
+    ids: ['mecca', 'citymall', 'taj', 'abdali-mall', 'galleria'],
+  },
 ]
+
+/** Every generic word → its landmark ids (what the geocoder and the rule-based parser look up). */
+export const AMBIGUOUS_TERMS: { term: string; ids: string[] }[] = GENERIC_CATEGORIES.flatMap((c) =>
+  c.terms.map((term) => ({ term, ids: c.ids })),
+)
 
 /**
  * The rider's default pickup when none is said ("current location"). Must match

@@ -8,6 +8,7 @@
 // Requests are spaced out: Groq's free tier allows ~8k LLM tokens per minute.
 
 import { GATED_LANDMARKS, JORDAN_CIRCLES } from '../src/data/geoKnowledge.ts'
+import { GENERIC_CATEGORIES, LANDMARKS } from '../src/data/landmarks.ts'
 import { straightLineKm } from '../src/lib/text.ts'
 
 const API = process.env.API_URL ?? 'http://localhost:8000/api'
@@ -18,6 +19,7 @@ const NOTES_SEPARATOR = ' • '
 
 interface Point { lat: number; lng: number }
 interface Place extends Point { name: string; confidence: number }
+interface Option extends Point { field: string; name: string }
 interface ParseResponse {
   success: boolean
   transcript?: string
@@ -27,6 +29,7 @@ interface ParseResponse {
   fareEstimate?: { min: number; max: number; currency: string } | null
   route?: { distanceKm: number } | null
   needsDisambiguation?: boolean
+  options?: Option[]
   error?: { code: string; message: string }
 }
 
@@ -41,6 +44,28 @@ const gate = (landmark: string, id: string) => {
   return g
 }
 const CURRENT_LOCATION = 'موقعي الحالي (عمان)'
+const landmark = (id: string) => {
+  const l = LANDMARKS.find((x) => x.id === id)
+  if (!l) throw new Error(`no landmark "${id}" in landmarks.ts`)
+  return l
+}
+const category = (c: string) => GENERIC_CATEGORIES.find((x) => x.category === c)!.ids.map(landmark)
+
+/** A generic category must ask, with exactly its registry places, in order, at their pins. */
+function asksCategory(r: ParseResponse, cat: string, lang: 'ar' | 'en') {
+  const expected = category(cat)
+  check(r.success === true, 'success', r.error ? `${r.error.code}: ${r.error.message}` : undefined)
+  check(r.needsDisambiguation === true, 'asks «قصدك؟»')
+  check(r.options?.length === expected.length, `${expected.length} options`, `got ${r.options?.length}`)
+  check(Boolean(r.options?.every((o) => o.field === 'dropoff')), 'all for the destination')
+  check(r.fareEstimate === null, 'no fare until chosen')
+  expected.forEach((l, i) => {
+    const o = r.options?.[i]
+    const name = lang === 'en' ? l.en : l.name
+    check(o?.name === name, `option ${i + 1} = ${name}`, o?.name)
+    if (o) near({ ...o, confidence: 1 }, l, `option ${i + 1} pinned`)
+  })
+}
 
 // ---------------------------------------------------------------- tiny assertion kit
 
@@ -120,6 +145,26 @@ const CASES: { title: string; text: string; verify: (r: ParseResponse) => void }
       check(r.dropoff?.name === '7th Circle', 'dropoff named in English', r.dropoff?.name)
       near(r.dropoff, circle('seventh'), 'dropoff on 7th Circle')
       check(!/[؀-ۿ]/.test(r.transcript ?? ''), 'transcript stays English', r.transcript)
+    },
+  },
+  {
+    title: 'Generic category → five hospitals (Arabic)',
+    text: 'وصلني ع المستشفى',
+    verify: (r) => asksCategory(r, 'hospital', 'ar'),
+  },
+  {
+    title: 'Generic category → five malls (English)',
+    text: 'take me to the mall',
+    verify: (r) => asksCategory(r, 'mall', 'en'),
+  },
+  {
+    title: 'Tapped option (fast path, no LLM)',
+    text: 'إلى مستشفى الخالدي',
+    verify: (r) => {
+      rideIsComplete(r)
+      check(r.pickup?.name === CURRENT_LOCATION, 'pickup = current location', r.pickup?.name)
+      check(r.dropoff?.name === 'مستشفى الخالدي', 'dropoff = مستشفى الخالدي', r.dropoff?.name)
+      near(r.dropoff, landmark('khalidi'), 'dropoff at Al-Khalidi Hospital')
     },
   },
 ]

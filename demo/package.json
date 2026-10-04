@@ -2,12 +2,19 @@
   "name": "petravoice-demo",
   "private": true,
   "type": "module",
-  "description": "Demo-day helpers: public HTTPS tunnel (Cloudflare Quick Tunnel) + QR code for the judges.",
+  "description": "Demo-day helpers: public HTTPS tunnel + QR code, and the automated demo video recorder.",
   "scripts": {
     "tunnel": "node tunnel.js",
-    "qr": "node generate-qr.js"
+    "qr": "node generate-qr.js",
+    "record": "node record-demo.mjs",
+    "record:vertical": "node record-vertical.mjs"
   },
   "dependencies": {
     "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "^5.3.0",
+    "msedge-tts": "^2.0.9",
+    "playwright": "^1.63.0"
   }
 }

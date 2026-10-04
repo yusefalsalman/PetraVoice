@@ -157,7 +157,7 @@ export async function mockParseText(text: string): Promise<ParseRideResponse> {
   const rideType = detectRideType(text)
 
   if (options.length > 0) {
-    // Contract: exactly two options, one field at a time.
+    // Contract: two to five options, one field at a time.
     return { success: true, transcript: text, pickup, dropoff, rideType, fareEstimate: null, needsDisambiguation: true, options: options.slice(0, 2) }
   }
 

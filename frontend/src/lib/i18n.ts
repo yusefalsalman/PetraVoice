@@ -64,6 +64,7 @@ const ar = {
   pickup: 'نقطة الانطلاق',
   dropoff: 'الوجهة',
   neither: 'لا هذا ولا ذاك — أعد التسجيل',
+  sayInstead: 'أو قول اسمها بصوتك',
 
   booked: 'تم تأكيد رحلتك!',
   driverOnWay: 'السائق في الطريق إليك، يصل خلال',
@@ -139,6 +140,7 @@ const en: Strings = {
   pickup: 'Pickup',
   dropoff: 'Destination',
   neither: 'Neither — try again',
+  sayInstead: 'Or say its name',
 
   booked: 'Your ride is confirmed!',
   driverOnWay: 'Your driver is on the way, arriving in',
@@ -228,6 +230,16 @@ const PLACE_NAMES_EN: Record<string, string> = {
   'الدوار الثالث': '3rd Circle',
   'الدوار الرابع': '4th Circle',
   'دوار صويلح': 'Sweileh Circle',
+  'جامعة البترا': 'University of Petra',
+  'جامعة الإسراء': 'Isra University',
+  'جامعة الزيتونة': 'Al-Zaytoonah University of Jordan',
+  'مستشفى الخالدي': 'Al-Khalidi Hospital',
+  'المستشفى التخصصي': 'The Specialty Hospital',
+  'مدارس الكلية العلمية الإسلامية': 'Islamic Scientific College School',
+  'مدارس النظم الحديثة': 'Modern Systems Schools',
+  'المدرسة الأهلية للبنات': 'Ahliyyah School for Girls',
+  'العبدلي مول': 'Abdali Mall',
+  'جاليريا مول': 'Galleria Mall',
   'الجامعة الأردنية': 'University of Jordan',
   'المدرج الروماني - وسط البلد': 'Roman Theatre – Downtown',
   'مطار الملكة علياء الدولي': 'Queen Alia International Airport',
@@ -256,6 +268,32 @@ export function placeName(name: string, lang: Lang): string {
   const { main, notes } = splitNotes(name)
   const shown = lang === 'en' ? (PLACE_NAMES_EN[main] ?? main) : main
   return notes ? `${shown}${NOTES_SEPARATOR}${notes}` : shown
+}
+
+/** Neighbourhood shown under a «قصدك؟» option, keyed by the Arabic name the API returns. */
+const PLACE_AREAS: Record<string, { ar: string; en: string }> = {
+  'الجامعة الأردنية - البوابة الشمالية': { ar: 'الجبيهة', en: 'Al-Jubeiha' },
+  'جامعة العلوم التطبيقية': { ar: 'شفا بدران', en: 'Shafa Badran' },
+  'جامعة البترا': { ar: 'طريق المطار', en: 'Airport Road' },
+  'جامعة الإسراء': { ar: 'طريق المطار', en: 'Airport Road' },
+  'جامعة الزيتونة': { ar: 'طريق المطار', en: 'Airport Road' },
+  'مستشفى الجامعة الأردنية': { ar: 'الجبيهة', en: 'Al-Jubeiha' },
+  'مستشفى الخالدي': { ar: 'جبل عمان', en: 'Jabal Amman' },
+  'المستشفى التخصصي': { ar: 'الشميساني', en: 'Shmeisani' },
+  'مستشفى الأردن': { ar: 'قرب الدوار الرابع', en: 'near 4th Circle' },
+  'مدارس الكلية العلمية الإسلامية': { ar: 'جبل عمان', en: 'Jabal Amman' },
+  'مدارس النظم الحديثة': { ar: 'تلاع العلي', en: "Tla'a Al-Ali" },
+  'المدرسة الأهلية للبنات': { ar: 'جبل عمان', en: 'Jabal Amman' },
+  'تاج مول': { ar: 'عبدون', en: 'Abdoun' },
+  'العبدلي مول': { ar: 'العبدلي', en: 'Abdali' },
+  'جاليريا مول': { ar: 'الصويفية', en: 'Sweifieh' },
+}
+
+/** Area hint for a place name in either language, or null. */
+export function placeArea(name: string, lang: Lang): string | null {
+  const main = splitNotes(name).main
+  const key = main in PLACE_AREAS ? main : Object.keys(PLACE_NAMES_EN).find((k) => PLACE_NAMES_EN[k] === main)
+  return key && PLACE_AREAS[key] ? PLACE_AREAS[key][lang] : null
 }
 
 /** Popular destinations, shown and sent in the UI language. */

@@ -113,7 +113,8 @@ parseRideRouter.post('/parse-ride', upload.single('audio'), async (req, res) => 
   const pickup = pickupRes?.kind === 'found' ? withGate(pickupRes.place, ex.pickup?.detail ?? null, ex.language) : null
   const dropoff = dropoffRes?.kind === 'found' ? withGate(dropoffRes.place, ex.dropoff?.detail ?? null, ex.language) : null
 
-  // 4. Ambiguous → exactly two options for one field (dropoff first), no fare yet.
+  // 4. Ambiguous → the options for one field (dropoff first), no fare yet: two similar places, or up
+  //    to five for a generic category («وصلني ع المستشفى»).
   const ambiguous =
     dropoffRes?.kind === 'ambiguous'
       ? { field: 'dropoff' as const, options: dropoffRes.options }

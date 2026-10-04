@@ -24,6 +24,9 @@ The frontend's Vite dev server proxies `/api` → `http://localhost:8000`.
    keep «دوار»), the gate apart («بوابة 2», "North Gate", «جهة تلاع العلي» — never sent to geocoding), up to 4 map search candidates
    in both languages (specific → broad) and the surrounding area. No key / LLM failure → rule-based parser
    (also bilingual).
+   **Fast path:** a request made only of exact, known landmark names in the app's own wording («إلى مستشفى
+   الخالدي», "from City Mall to Galleria Mall" — what the app sends when the rider taps a «قصدك؟» option) is
+   answered from the registry with no LLM call (`quickExtract` in `src/services/nlu.ts`).
    Place names come back in the request's language (`en` names in `src/data/landmarks.ts`, Nominatim
    `accept-language`). Error messages stay Arabic per the contract — the frontend shows English ones by code.
 4. **Geocoding cascade** (`src/services/geocode.ts`):
@@ -42,7 +45,8 @@ The frontend's Vite dev server proxies `/api` → `http://localhost:8000`.
    - L4 the area centre, named «… (المنطقة - موقع تقريبي)» at confidence 0.75
    Matches too far from the place's area are rejected: 6 km (neighbourhood the rider said), 15 km (city said),
    12 km (area only inferred by the LLM). Vague words or two similar hits →
-   `needsDisambiguation` with exactly two options. **Location problems never return 422**: a side that
+   `needsDisambiguation` with the options (two similar places, or up to five well-known places for a generic
+   category — «الجامعة», «المستشفى», «المدرسة», «المول»: `GENERIC_CATEGORIES` in `src/data/landmarks.ts`). **Location problems never return 422**: a side that
    can't be placed at all comes back `null` and the app asks the rider to fill it in.
 5. **Routing** — OSRM driving route (precision-5 polyline). Any failure → `route: null`.
 6. **Fare** — 0.40 JOD + 0.25 JOD/km (min 1.00), +15% upper range; Comfort ×1.35, Family XL ×1.70.

@@ -119,7 +119,7 @@ Jordanian circle, monument, hospital or university, map it to that landmark — 
 - «دوار» is often heard as «ورد» or «دور»: «ورد جندي» / «دور جندي» → «دوار الجندي»; «ورد الواحة» → «دوار الواحة».
 - «مستشفى الأمير فاسل» → «مستشفى الأمير فيصل»; «الخالدى» → «مستشفى الخالدي»; «العبدلى» → «العبدلي».
 - Nicknames: «التكنو» / «التكنولوجيا» → «جامعة العلوم والتكنولوجيا الأردنية»; «البوليفارد» → «العبدلي بوليفارد»; «السابع» → «الدوار السابع»; «البلد» → «وسط البلد»; «الأردنية» → «الجامعة الأردنية»; "Citadel" → "Amman Citadel"; "the airport" → "Queen Alia International Airport".
-- Vague category fitting several places (just «الجامعة» / «المول» / "the university" / "the mall") → name is exactly that word; don't pick one.
+- Vague category fitting several places (just «الجامعة» / «المستشفى» / «المدرسة» / «المول» / "the university" / "the hospital" / "the school" / "the mall") → name is exactly that word and candidates []; never pick one — the app asks the rider.
 
 4) AREA THE RIDER SAID
 If the rider names a neighbourhood / district / city with the place («مجمع بنك الإسكان بالشميساني»، «في مرج الحمام»، "in Abdoun"):
@@ -402,7 +402,39 @@ export function grounded(q: PlaceQuery | null, transcript: string): boolean {
   )
 }
 
+// ---------------------------------------------------------------- Fast path (no LLM)
+
+/** Every landmark spelling we know exactly, normalised. */
+const KNOWN_NAMES = new Set(LANDMARKS.flatMap((l) => [l.name, l.en, ...l.aliases]).map(normalizeArabic))
+// The app's own composed requests: «إلى X» / «من X إلى Y» / "to X" / "from X to Y".
+const COMPOSED: [RegExp, Lang][] = [
+  [/^(?:من\s+(.+?)\s+)?(?:إلى|الى)\s+(.+?)[.،]?$/, 'ar'],
+  [/^(?:from\s+(.+?)\s+)?to\s+(.+?)\.?$/i, 'en'],
+]
+
+/**
+ * A request that names only exact, known landmarks in the app's own wording — e.g. the
+ * «إلى مستشفى الخالدي» sent when the rider taps a «قصدك؟» option — needs no understanding:
+ * answer it from the registry without an LLM round trip (no tokens, ~1 s faster).
+ */
+export function quickExtract(transcript: string): Extraction | null {
+  for (const [pattern, language] of COMPOSED) {
+    const m = transcript.trim().match(pattern)
+    if (!m) continue
+    const [, pickup, dropoff] = m
+    if (!KNOWN_NAMES.has(normalizeArabic(dropoff)) || (pickup && !KNOWN_NAMES.has(normalizeArabic(pickup)))) return null
+    const q = (name: string): PlaceQuery => ({ name: name.trim(), detail: null, candidates: [], area: null })
+    return { language, pickup: pickup ? q(pickup) : null, dropoff: q(dropoff), rideType: detectRideType(transcript) }
+  }
+  return null
+}
+
 export async function extractRide(transcript: string): Promise<Extraction> {
+  const quick = quickExtract(transcript)
+  if (quick) {
+    console.log('[nlu] fast path — known landmarks only, no LLM call')
+    return quick
+  }
   const ex = await extractRideRaw(transcript)
   // Cross-check with the rule-based reading of the actual words: replace a side the LLM invented,
   // and fill a side it missed («انا بطبربور» dropped) when the words clearly name one.

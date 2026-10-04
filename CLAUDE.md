@@ -65,7 +65,9 @@ Content-Type: multipart/form-data
 
 **Response — ambiguous case (low confidence)**
 
-`needsDisambiguation: true` with exactly two entries in `options`. The frontend renders a choice screen.
+`needsDisambiguation: true` with **two to five** entries in `options`: two when a name matches two similar places,
+up to five for a generic category («وصلني ع المستشفى» → the best-known hospitals). All options are for the same
+`field`. The frontend renders a choice screen; tapping an option fills that side and re-requests the route.
 
 ```json
 {

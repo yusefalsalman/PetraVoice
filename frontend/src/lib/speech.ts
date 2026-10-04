@@ -76,6 +76,43 @@ export function confirmationText(c: Confirmation, lang: Lang): string {
   return `All set! I've lined up ${RIDE_EN[c.rideType]} ride from ${from} to ${to}. Estimated fare is ${price(c.fare)} JOD.`
 }
 
+// ---------------------------------------------------------------- «قصدك؟» prompt
+
+export type PlaceCategory = 'university' | 'hospital' | 'school' | 'mall'
+
+const CATEGORY_WORDS: [PlaceCategory, RegExp][] = [
+  ['university', /جامعة|university/i],
+  ['hospital', /مستشفى|hospital/i],
+  ['school', /مدرسة|مدارس|school/i],
+  ['mall', /مول|mall/i],
+]
+const CATEGORY_AR: Record<PlaceCategory, { word: string; to: string }> = {
+  university: { word: 'جامعة', to: 'عليها' },
+  hospital: { word: 'مستشفى', to: 'عليه' },
+  school: { word: 'مدرسة', to: 'عليها' },
+  mall: { word: 'مول', to: 'عليه' },
+}
+
+/** The kind of place every option is («الجامعة» → five universities), or null for mixed options. */
+export function optionsCategory(names: string[]): PlaceCategory | null {
+  return CATEGORY_WORDS.find(([, re]) => names.length > 0 && names.every((n) => re.test(n)))?.[0] ?? null
+}
+
+/** Heading and spoken question for the choice screen: «أي جامعة حاب تروح عليها؟…». */
+export function choicePrompt(category: PlaceCategory | null, field: 'pickup' | 'dropoff', lang: Lang) {
+  if (lang === 'ar') {
+    if (!category) return { heading: 'قصدك؟', spoken: 'قصدك وين بالضبط؟ اختار من الخيارات التالية.' }
+    const { word, to } = CATEGORY_AR[category]
+    return field === 'pickup'
+      ? { heading: `من أي ${word}؟`, spoken: `من أي ${word} بدك نوخذك؟ اختار من الخيارات التالية.` }
+      : { heading: `أي ${word}؟`, spoken: `أي ${word} حاب تروح ${to}؟ اختار من الخيارات التالية.` }
+  }
+  if (!category) return { heading: 'Did you mean?', spoken: 'Which one did you mean? Pick one of the options below.' }
+  return field === 'pickup'
+    ? { heading: `Which ${category}?`, spoken: `Which ${category} should we pick you up from? Pick one of the options below.` }
+    : { heading: `Which ${category}?`, spoken: `Which ${category} would you like to go to? Pick one of the options below.` }
+}
+
 // ---------------------------------------------------------------- Playback
 
 /**
