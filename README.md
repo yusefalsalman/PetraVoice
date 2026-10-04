@@ -316,8 +316,13 @@ npm run tunnel
 It checks both servers, opens the tunnel and prints a **QR code** for the projector. Keep the window open —
 closing it ends the tunnel. On Windows, `.\start-tunnel.ps1` from the project root does the same.
 
+**Permanent link — `https://yusefalsalman.github.io/PromptRider/`.** Quick Tunnels get a new random URL every
+time, so this GitHub Pages page (`docs/`) forwards visitors to whichever tunnel is running: `npm run tunnel` (and
+`start-tunnel.ps1`) push the new URL to `docs/demo.json` automatically. Print or project *this* link / QR code —
+it never changes. When no tunnel is running, the page says so instead of showing an error.
+
 > [!NOTE]
-> Every new tunnel gets a **new random URL**, so regenerate the QR code each time. The link is public:
+> Every new tunnel gets a **new random URL** — use the permanent link above for slides and QR codes. The link is public:
 > anyone who opens it uses your Groq quota. **iPhone:** turn off the silent switch to hear the spoken
 > confirmation.
 

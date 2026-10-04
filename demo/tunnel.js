@@ -6,6 +6,7 @@
 
 import { spawn } from 'node:child_process'
 import qrcode from 'qrcode-terminal'
+import { PERMANENT_LINK, publishLink } from './publish-link.js'
 
 const port = process.argv[2] ?? '5173'
 
@@ -72,6 +73,11 @@ const onOutput = (chunk) => {
     console.log('  Keep this window open — closing it (Ctrl+C) ends the tunnel.')
     console.log('  The URL may take ~10 s to start working after it appears.\n')
   })
+  // Point the permanent link (on the slides) at this tunnel.
+  if (publishLink(url)) {
+    console.log(`  ✓ Permanent link updated: ${PERMANENT_LINK} → ${url}`)
+    console.log('    (GitHub Pages refreshes in about a minute — the slides QR then opens this tunnel.)\n')
+  }
 }
 tunnel.stdout.on('data', onOutput)
 tunnel.stderr.on('data', onOutput) // cloudflared logs the URL on stderr

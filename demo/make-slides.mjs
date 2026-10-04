@@ -1,8 +1,8 @@
 // Builds the 6-slide judging deck → ../presentation_slides.pdf (1920×1080 per page, vector text).
 //
 //   (backend on :8000 and frontend on :5173 running — for the app screenshots)
-//   cd demo && npm run slides                                   # slide 5 → GitHub repo QR
-//   cd demo && npm run slides -- https://<name>.trycloudflare.com   # slide 5 → live demo QR
+//   cd demo && npm run slides                                   # slide 5 → permanent link QR (recommended)
+//   cd demo && npm run slides -- https://<name>.trycloudflare.com   # slide 5 → one specific tunnel
 //   add --fresh to retake the app screenshots (otherwise the saved ones are reused: no API calls)
 //
 // Steps: screenshot the real app (home, a gate ride, the «أي جامعة؟» choice), make the QR code,
@@ -19,7 +19,9 @@ const ROOT = resolve(HERE, '..')
 const OUT = join(ROOT, 'presentation_slides.pdf')
 const ASSETS = join(HERE, 'demo-recordings', 'slides')
 const APP_URL = process.env.APP_URL ?? 'http://localhost:5173'
-const REPO = 'https://github.com/yusefalsalman/PromptRider'
+import { PERMANENT_LINK } from './publish-link.js'
+
+const REPO = 'github.com/yusefalsalman/PromptRider'
 const ARGS = process.argv.slice(2)
 const LIVE = ARGS.find((a) => a.startsWith('https://')) ?? null
 const FRESH = ARGS.includes('--fresh')
@@ -137,7 +139,7 @@ function slides({ home, gate, choice, arch, qr, link, linkLabel }) {
     // 5 — Live demo
     `<section class="slide">${head(5, 'Live Demo', 'Try PetraVoice Live')}
       <div class="demo">
-        <div class="qrbox"><img src="${qr}" alt="QR code"><div class="url">${linkLabel}</div><div class="hint">${LIVE ? 'Scan with your phone camera · allow the microphone' : 'Source code · the live link is shown on stage'}</div></div>
+        <div class="qrbox"><img src="${qr}" alt="QR code"><div class="url">${linkLabel}</div><div class="hint">Scan with your phone camera · allow the microphone</div><div class="code">Code: ${REPO}</div></div>
         <div class="prompts">
           <h3>Say one of these after tapping the mic</h3>
           <div class="prompt"><span class="ar big" dir="rtl">«بدي سيارة من مكة مول بوابة 2 لدوار صويلح»</span><span class="tag">exact gate pin + circle</span></div>
@@ -237,6 +239,7 @@ const CSS = String.raw`
   .qrbox img { width: 440px; height: 440px; }
   .url { margin-top: 18px; font-size: 24px; font-weight: 800; color: var(--blue); word-break: break-all; }
   .hint { margin-top: 10px; font-size: 19px; color: var(--muted); }
+  .code { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 18px; font-weight: 600; color: var(--muted); }
   .prompts h3 { margin-bottom: 22px; }
   .prompt { display: flex; align-items: center; justify-content: space-between; gap: 24px; background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 20px 28px; margin-bottom: 16px; }
   .prompt .big { font-size: 32px; }
@@ -262,7 +265,8 @@ if (FRESH || !shots.every((f) => existsSync(f))) {
   await screenshots()
 } else log('reusing the saved app screenshots (--fresh to retake)')
 
-const link = LIVE ?? REPO
+// The permanent link forwards to whichever tunnel `npm run tunnel` started last.
+const link = LIVE ?? PERMANENT_LINK
 const qr = await QRCode.toDataURL(link, { width: 880, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0f172a', light: '#ffffff' } })
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Tajawal:wght@500;700;800&display=block" rel="stylesheet">
@@ -273,7 +277,7 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
   arch: dataUrl(join(ROOT, 'architecture_diagram.png')),
   qr,
   link,
-  linkLabel: LIVE ? link.replace('https://', '') : 'github.com/yusefalsalman/PromptRider',
+  linkLabel: link.replace('https://', '').replace(/\/$/, ''),
 })}</body></html>`
 writeFileSync(join(ASSETS, 'slides.html'), html)
 

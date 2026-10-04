@@ -21,8 +21,14 @@ cd frontend && npm run dev
 cd demo && npm run tunnel
 ```
 
-`npm run tunnel` checks both servers, opens the tunnel and prints a QR code for the projector. Keep that
-window open — closing it ends the tunnel. A new URL is generated every time it starts.
+`npm run tunnel` checks both servers, opens the tunnel, prints a QR code for the projector, and points the
+**permanent link** at it. Keep that window open — closing it ends the tunnel.
+
+**Permanent link:** `https://yusefalsalman.github.io/PromptRider/` (GitHub Pages, `docs/`). Each tunnel gets a
+new random URL, so `publish-link.js` writes it to `docs/demo.json` and pushes it; the page forwards visitors
+there about a minute later. Use this link on slides and printed QR codes — it never changes.
+One-time setup: the repo must be public and GitHub Pages enabled (Settings → Pages → Deploy from a branch →
+`main` / `/docs`).
 
 Already have a URL? `npm run qr -- https://<name>.trycloudflare.com` just prints its QR code.
 
