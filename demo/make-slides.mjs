@@ -267,7 +267,12 @@ if (FRESH || !shots.every((f) => existsSync(f))) {
 
 // The permanent link forwards to whichever tunnel `npm run tunnel` started last.
 const link = LIVE ?? PERMANENT_LINK
-const qr = await QRCode.toDataURL(link, { width: 880, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0f172a', light: '#ffffff' } })
+// The standard QR (demo/petravoice-qr.png, the permanent link) — regenerated so it always matches.
+const STANDARD_QR = join(HERE, 'petravoice-qr.png')
+await QRCode.toFile(STANDARD_QR, PERMANENT_LINK, { width: 800, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#00174b', light: '#ffffff' } })
+const qr = LIVE
+  ? await QRCode.toDataURL(link, { width: 880, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#00174b', light: '#ffffff' } })
+  : dataUrl(STANDARD_QR)
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Tajawal:wght@500;700;800&display=block" rel="stylesheet">
 <style>${CSS}</style></head><body>${slides({
