@@ -10,7 +10,7 @@ export type Lang = 'ar' | 'en'
 const plural = (n: number) => (n >= 3 && n <= 10 ? 'دقائق' : 'دقيقة')
 
 const ar = {
-  appName: 'بترا فويس',
+  appName: 'PetraRide',
   switchLang: 'Switch to English',
   sheetLabel: 'تفاصيل الرحلة',
   sheetHide: 'إخفاء التفاصيل لعرض الخريطة كاملة',
@@ -86,7 +86,7 @@ const ar = {
 type Strings = typeof ar
 
 const en: Strings = {
-  appName: 'PetraVoice',
+  appName: 'PetraRide',
   switchLang: 'التبديل إلى العربية',
   sheetLabel: 'Trip details',
   sheetHide: 'Hide details to see the full map',
