@@ -173,6 +173,10 @@ microphone, Whisper and the LLM — and edits it with FFmpeg: a **1080p landscap
 
 ## 🏗️ System Architecture
 
+![PetraVoice system architecture](architecture_diagram.png)
+
+<sub>Regenerate with <code>cd demo &amp;&amp; npm run diagram</code>.</sub>
+
 ```mermaid
 flowchart TD
     A["🎙️ Rider's voice<br/><sub>MediaRecorder + Web Audio waveform</sub>"] --> B

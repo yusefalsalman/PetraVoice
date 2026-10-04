@@ -7,7 +7,8 @@
     "tunnel": "node tunnel.js",
     "qr": "node generate-qr.js",
     "record": "node record-demo.mjs",
-    "record:vertical": "node record-vertical.mjs"
+    "record:vertical": "node record-vertical.mjs",
+    "diagram": "node render-architecture.mjs"
   },
   "dependencies": {
     "qrcode-terminal": "^0.12.0"
