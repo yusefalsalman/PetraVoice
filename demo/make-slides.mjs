@@ -21,7 +21,7 @@ const ASSETS = join(HERE, 'demo-recordings', 'slides')
 const APP_URL = process.env.APP_URL ?? 'http://localhost:5173'
 import { PERMANENT_LINK } from './publish-link.js'
 
-const REPO = 'github.com/yusefalsalman/PromptRider'
+const REPO = 'github.com/yusefalsalman/PetraVoice'
 const ARGS = process.argv.slice(2)
 const LIVE = ARGS.find((a) => a.startsWith('https://')) ?? null
 const FRESH = ARGS.includes('--fresh')

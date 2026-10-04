@@ -117,7 +117,7 @@ try {
 
     Write-Host "[OK] Captured Tunnel URL: $capturedUrl" -ForegroundColor Green
 
-    # Point the permanent link (https://yusefalsalman.github.io/PromptRider/) at this tunnel.
+    # Point the permanent link (https://yusefalsalman.github.io/PetraVoice/) at this tunnel.
     node (Join-Path $demoDir 'publish-link.js') $capturedUrl
 
     # 4. Pass that tunnel URL into npm run qr -- inside demo directory

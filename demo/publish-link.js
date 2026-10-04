@@ -1,4 +1,4 @@
-// Points the permanent demo link (https://yusefalsalman.github.io/PromptRider/) at the tunnel that
+// Points the permanent demo link (https://yusefalsalman.github.io/PetraVoice/) at the tunnel that
 // is running now: writes its URL to docs/demo.json, commits only that file and pushes. GitHub Pages
 // redeploys in about a minute; docs/index.html then forwards visitors to the new tunnel.
 //
@@ -9,7 +9,7 @@ import { writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const PERMANENT_LINK = 'https://yusefalsalman.github.io/PromptRider/'
+export const PERMANENT_LINK = 'https://yusefalsalman.github.io/PetraVoice/'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const FILE = join(ROOT, 'docs', 'demo.json')
