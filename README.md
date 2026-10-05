@@ -176,10 +176,6 @@ microphone, Whisper and the LLM — and edits it with FFmpeg: a **1080p landscap
 
 ## 🏗️ System Architecture
 
-![PetraVoice system architecture](architecture_diagram.png)
-
-<sub>Regenerate with <code>cd demo &amp;&amp; npm run diagram</code>.</sub>
-
 ```mermaid
 flowchart TD
     A["🎙️ Rider's voice<br/><sub>MediaRecorder + Web Audio waveform</sub>"] --> B
@@ -388,8 +384,7 @@ npm run record:vertical     # → backend/demo_video_vertical_final.mp4  (vertic
 PetraVoice/
 ├── frontend/     React + Vite mobile UI          →  frontend/README.md
 ├── backend/      Express API, NLU & geocoding    →  backend/README.md
-├── demo/         Tunnel + QR code, demo-video recorders  →  demo/README.md
-└── CLAUDE.md     Shared API contract (single source of truth)
+└── demo/         Tunnel + QR code, demo-video recorders  →  demo/README.md
 ```
 
 Key places to extend:
