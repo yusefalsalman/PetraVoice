@@ -1,4 +1,5 @@
 import { config } from '../config.ts'
+import { CITY_IDS } from '../data/geoKnowledge.ts'
 import { AMBIGUOUS_TERMS, CURRENT_LOCATION, CURRENT_LOCATION_PHRASES } from '../data/landmarks.ts'
 import { db } from '../db/database.ts'
 import { editDistance, normalizeArabic, straightLineKm } from '../lib/text.ts'
@@ -91,7 +92,8 @@ function resolveFromKnowledgeBase(q: string, lang: Lang): Resolution | null {
   // ones are usually its area.
   const padded = ` ${q} `
   const position = (a: AliasRow) => (a.alias.length >= 5 ? q.indexOf(a.alias) : padded.indexOf(` ${a.alias} `))
-  const contained = ALIASES.filter((a) => position(a) >= 0 && !FACILITY.test(q.replace(a.alias, ' '))).sort(
+  // Cities only match as the whole name: «مستشفى الأمير فيصل الزرقاء» is not the city of Zarqa.
+  const contained = ALIASES.filter((a) => !CITY_IDS.has(a.id) && position(a) >= 0 && !FACILITY.test(q.replace(a.alias, ' '))).sort(
     (a, b) => position(a) - position(b) || b.alias.length - a.alias.length,
   )[0]
   if (contained) return { kind: 'found', place: kbCandidate(contained, 0.85, lang) }
@@ -112,7 +114,12 @@ interface NominatimHit {
   importance: number
   /** District / city, e.g. «الرمثا» — used to tell same-named places apart. */
   area?: string
+  /** A road («شارع العقبة»), not a place — only a match when the rider asked for a street. */
+  street?: boolean
 }
+
+/** Did the rider ask for a road? Otherwise streets named after a place («شارع العقبة») aren't it. */
+const asksForStreet = (query: string) => /شارع|طريق|street|road|avenue|\bst\b/i.test(query)
 
 /** «…, قضاء الرمثا, لواء الرمثا, إربد, الأردن» → «الرمثا»; "…, Ar-Ramtha District, Irbid, Jordan" → "Ar-Ramtha". */
 function areaOf(displayName: string): string | undefined {
@@ -143,7 +150,8 @@ async function politeFetch(url: string): Promise<Response> {
 
 async function searchNominatim(query: string, lang: Lang): Promise<NominatimHit[]> {
   // Names come back in the request's language, so cache per language.
-  const key = `${lang}:${normalizeArabic(query)}`
+  // v2: hits now carry `street` (older cache entries don't, so they're not reused).
+  const key = `v2:${lang}:${normalizeArabic(query)}`
   const cached = cacheGet.get(key) as { results: string; createdAt: number } | undefined
   if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) return JSON.parse(cached.results) as NominatimHit[]
 
@@ -159,7 +167,7 @@ async function searchNominatim(query: string, lang: Lang): Promise<NominatimHit[
   })
   const res = await politeFetch(`${config.nominatimUrl}/search?${params}`)
   if (!res.ok) throw new Error(`Nominatim HTTP ${res.status}`)
-  const raw = (await res.json()) as { lat: string; lon: string; name?: string; display_name: string; importance?: number }[]
+  const raw = (await res.json()) as { lat: string; lon: string; name?: string; display_name: string; importance?: number; class?: string }[]
 
   const hits: NominatimHit[] = []
   for (const r of raw) {
@@ -169,6 +177,7 @@ async function searchNominatim(query: string, lang: Lang): Promise<NominatimHit[
       lng: Number(r.lon),
       importance: r.importance ?? 0,
       area: areaOf(r.display_name),
+      street: r.class === 'highway',
     }
     // Drop near-duplicates (same place mapped twice, e.g. building + entrance).
     if (!hits.some((h) => straightLineKm(h, hit) < 1)) hits.push(hit)
@@ -192,6 +201,7 @@ async function resolveFromNominatim(query: string, opts: NominatimOptions): Prom
     console.warn(`[geocode] Nominatim failed for «${query}»:`, (e as Error).message)
     return { kind: 'not_found' }
   }
+  if (!asksForStreet(query)) hits = hits.filter((h) => !h.street)
   if (hits.length === 0) return { kind: 'not_found' }
 
   const toCandidate = (h: NominatimHit, confidence: number): Candidate => ({
@@ -218,7 +228,7 @@ async function resolveFromNominatim(query: string, opts: NominatimOptions): Prom
 const JORDAN_BBOX = '34.9,29.1,39.4,33.4'
 
 async function searchPhoton(query: string, lang: Lang): Promise<NominatimHit[]> {
-  const key = `photon:${lang}:${normalizeArabic(query)}`
+  const key = `photon2:${lang}:${normalizeArabic(query)}`
   const cached = cacheGet.get(key) as { results: string; createdAt: number } | undefined
   if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) return JSON.parse(cached.results) as NominatimHit[]
 
@@ -232,7 +242,7 @@ async function searchPhoton(query: string, lang: Lang): Promise<NominatimHit[]> 
   const body = (await res.json()) as {
     features: {
       geometry: { coordinates: [number, number] }
-      properties: { name?: string; countrycode?: string; city?: string; district?: string; county?: string }
+      properties: { name?: string; countrycode?: string; city?: string; district?: string; county?: string; osm_key?: string }
     }[]
   }
   const hits: NominatimHit[] = body.features
@@ -243,6 +253,7 @@ async function searchPhoton(query: string, lang: Lang): Promise<NominatimHit[]> 
       lng: f.geometry.coordinates[0],
       importance: 0,
       area: f.properties.city ?? f.properties.district ?? f.properties.county,
+      street: f.properties.osm_key === 'highway',
     }))
   cachePut.run(key, JSON.stringify(hits), Date.now())
   return hits
@@ -453,8 +464,12 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
     // The rider's own name matching a landmark (even with a typo, «دوار الواهة») IS that landmark —
     // unless what matched is just the area («دوار الاتصالات مرج الحمام» → «مرج الحمام»).
     if (i === 0) {
+      // (A city the rider named — «من الطفيلة» — is the destination itself, not just its area.)
       const isJustTheArea =
-        local.kind === 'found' && q.area !== null && normalizeArabic(local.place.name) === normalizeArabic(q.area)
+        local.kind === 'found' &&
+        q.area !== null &&
+        !CITY_IDS.has(local.place.landmarkId ?? '') &&
+        normalizeArabic(local.place.name) === normalizeArabic(q.area)
       if (!isJustTheArea) return local
       areaFallback ??= local.place
       continue
@@ -508,6 +523,7 @@ export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Re
   )
   for (const [i, hits] of photonHits.entries()) {
     for (const h of hits) {
+      if (h.street && !asksForStreet(q.name)) continue // «شارع الطفيل بن النعمان» is not «الطفيلة»
       if (!sharesWord(queries[i], h.name) || !sameKind(q.name, h.name)) continue
       // Asked for a «مجمع» but found a plain «بنك الإسكان» (a branch): close, but not the place.
       const missingKind = [...typesOf(q.name)].some((t) => !typesOf(h.name).has(t))

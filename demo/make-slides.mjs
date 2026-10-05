@@ -155,8 +155,8 @@ function slides({ home, gate, choice, arch, qr, link, linkLabel }) {
     `<section class="slide">${head(6, 'Testing, Edge Cases &amp; Roadmap', 'Validation, Current Limitations &amp; Next Steps')}
       <div class="cols3">
         <div class="col green"><h3>✅ What we tested</h3><ul>
-          <li>Automated end-to-end suite: <b>9 / 9 passing</b>, every pin checked to within 30 m</li>
-          <li>Gate pins: Mecca Mall (Gate 2), UJ North Gate; circles incl. Sweileh and ${ar('الكيلو')}</li>
+          <li>Automated end-to-end suite: <b>10 / 10 passing</b>, every pin checked to within 30 m</li>
+          <li>Gate pins: Mecca Mall (Gate 2), UJ North Gate; circles incl. Sweileh and ${ar('الكيلو')}; cities across Jordan (Tafila → Aqaba, 206 km)</li>
           <li>Dialect, fillers and nicknames; English requests; ride type from speech</li>
           <li>Generic places: 5 hospitals / 5 malls; tapped choice answered without the LLM</li>
           <li>Real speech through the mic pipeline — Whisper transcripts word-for-word</li>
@@ -172,7 +172,7 @@ function slides({ home, gate, choice, arch, qr, link, linkLabel }) {
           <li>Crowd-sourced gate &amp; entrance registry for more venues</li>
           <li>Offline-cached intents for frequent trips</li>
           <li>Driver-side voice navigation to the exact gate</li>
-          <li>Aqaba and other cities</li>
+          <li>Gate-level detail for Aqaba, Irbid and other cities</li>
         </ul></div>
       </div>
     </section>`,

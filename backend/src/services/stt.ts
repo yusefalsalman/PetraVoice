@@ -29,7 +29,7 @@ export const isSupportedAudio = (mime: string) => baseMime(mime) in EXTENSIONS
 // the language — that is detected from the audio). Kept short: Groq caps the prompt at 224 tokens.
 // Local names (and the word «دوار», which Whisper otherwise hears as «ورد» / «دور») bias the decoder.
 const ARABIC_PROMPT =
-  'تطبيق حجز سيارات في الأردن، عمان، الزرقاء، إربد، العقبة، دوار الجندي، دوار الواحة، دوار الدلة، الدوار السابع، مستشفى الجامعة، طبربور، مرج الحمام، صويلح، العبدلي، مكة مول، سيتي مول.'
+  'تطبيق حجز سيارات في الأردن، عمان، الزرقاء، إربد، الرمثا، المفرق، الكرك، الطفيلة، معان، العقبة، دوار الجندي، دوار الواحة، دوار الدلة، الدوار السابع، مستشفى الجامعة، طبربور، مرج الحمام، صويلح، العبدلي، مكة مول، سيتي مول.'
 // Auto mode: the same Arabic context plus a short English line — the spoken language itself is
 // detected from the audio, so English speech is still transcribed in English.
 const BILINGUAL_PROMPT = `${ARABIC_PROMPT} Ride app in Amman, Jordan: 7th Circle, Abdali Boulevard, City Mall.`

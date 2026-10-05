@@ -167,6 +167,18 @@ const CASES: { title: string; text: string; verify: (r: ParseResponse) => void }
       near(r.dropoff, landmark('khalidi'), 'dropoff at Al-Khalidi Hospital')
     },
   },
+  {
+    title: 'City to city, outside Amman (Arabic)',
+    text: 'بدي اروح من الطفيلة على العقبة',
+    verify: (r) => {
+      rideIsComplete(r)
+      check(r.pickup?.name === 'الطفيلة', 'pickup = الطفيلة (the city, not a street)', r.pickup?.name)
+      check(r.dropoff?.name === 'العقبة', 'dropoff = العقبة (the city, not «شارع العقبة»)', r.dropoff?.name)
+      near(r.pickup, landmark('city-tafila'), 'pickup at Tafila town centre')
+      near(r.dropoff, landmark('city-aqaba'), 'dropoff at Aqaba city centre')
+      check((r.route?.distanceKm ?? 0) > 150, 'long-distance road route', `${r.route?.distanceKm} km`)
+    },
+  },
 ]
 
 // ---------------------------------------------------------------- TTS

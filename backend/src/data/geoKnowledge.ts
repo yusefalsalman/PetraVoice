@@ -104,6 +104,39 @@ export function findGate(landmarkId: string, gateText: string): { landmark: Gate
   return gate ? { landmark, gate } : null
 }
 
+// ---------------------------------------------------------------- Cities & towns
+
+/**
+ * Jordan's cities and main towns, pinned on the town centre (OSM `place=city/town`, checked 2026-10).
+ * Without them a bare «العقبة» or «الطفيلة» was found as an Amman street named after the city
+ * («شارع العقبة»). They only match a request that names the city itself — never as part of a longer
+ * name («مستشفى الأمير فيصل الزرقاء» stays a hospital search).
+ */
+export const JORDAN_CITIES: Landmark[] = [
+  { id: 'city-aqaba', name: 'العقبة', en: 'Aqaba', aliases: ['مدينة العقبة', 'Al Aqaba', 'Akaba'], lat: 29.5266, lng: 35.0075 },
+  { id: 'city-karak', name: 'الكرك', en: 'Karak', aliases: ['مدينة الكرك', 'Al Karak', 'Kerak'], lat: 31.1847, lng: 35.7047 },
+  { id: 'city-maan', name: 'معان', en: 'Ma’an', aliases: ['مدينة معان', "Ma'an", 'Maan'], lat: 30.2, lng: 35.7333 },
+  { id: 'city-tafila', name: 'الطفيلة', en: 'Tafila', aliases: ['مدينة الطفيلة', 'الطفيله', 'Tafilah', 'At Tafilah'], lat: 30.8333, lng: 35.6 },
+  { id: 'city-mafraq', name: 'المفرق', en: 'Mafraq', aliases: ['مدينة المفرق', 'Al Mafraq'], lat: 32.3424, lng: 36.2075 },
+  { id: 'city-irbid', name: 'إربد', en: 'Irbid', aliases: ['اربد', 'مدينة إربد', 'مدينة اربد'], lat: 32.5556, lng: 35.8493 },
+  { id: 'city-ramtha', name: 'الرمثا', en: 'Ramtha', aliases: ['مدينة الرمثا', 'Ar Ramtha', 'Al Ramtha'], lat: 32.5592, lng: 36.0069 },
+  { id: 'city-zarqa', name: 'الزرقاء', en: 'Zarqa', aliases: ['الزرقا', 'مدينة الزرقاء', 'Az Zarqa'], lat: 32.0668, lng: 36.0886 },
+  { id: 'city-russeifa', name: 'الرصيفة', en: 'Russeifa', aliases: ['الرصيفه', 'Ruseifa'], lat: 32.0175, lng: 36.0435 },
+  { id: 'city-salt', name: 'السلط', en: 'Salt', aliases: ['مدينة السلط', 'As Salt', 'Al Salt'], lat: 32.0391, lng: 35.727 },
+  { id: 'city-madaba', name: 'مادبا', en: 'Madaba', aliases: ['مأدبا', 'مدينة مادبا'], lat: 31.7166, lng: 35.7944 },
+  { id: 'city-jerash', name: 'جرش', en: 'Jerash', aliases: ['مدينة جرش', 'Jarash'], lat: 32.2812, lng: 35.901 },
+  { id: 'city-ajloun', name: 'عجلون', en: 'Ajloun', aliases: ['مدينة عجلون', 'Ajlun'], lat: 32.3323, lng: 35.7521 },
+  { id: 'city-petra', name: 'البتراء (وادي موسى)', en: 'Petra (Wadi Musa)', aliases: ['البتراء', 'البترا', 'وادي موسى', 'Petra', 'Wadi Musa'], lat: 30.3217, lng: 35.4801 },
+  { id: 'city-wadirum', name: 'وادي رم', en: 'Wadi Rum', aliases: ['قرية وادي رم', 'Wadi Rum Village', 'Rum'], lat: 29.5748, lng: 35.4218 },
+  { id: 'city-azraq', name: 'الأزرق', en: 'Azraq', aliases: ['الازرق', 'Al Azraq'], lat: 31.8833, lng: 36.8167 },
+  { id: 'city-shoubak', name: 'الشوبك', en: 'Shoubak', aliases: ['Shobak', 'Shawbak'], lat: 30.52, lng: 35.5384 },
+  // The resort strip at Sweimeh (Holiday Inn / Hilton area), where riders actually go.
+  { id: 'city-deadsea', name: 'البحر الميت', en: 'Dead Sea', aliases: ['البحر الميت (الفنادق)', 'فنادق البحر الميت', 'سويمة', 'Dead Sea Hotels', 'Sweimeh'], lat: 31.7509, lng: 35.5898 },
+]
+
+/** Ids of the city entries (matched only as a whole name). */
+export const CITY_IDS = new Set(JORDAN_CITIES.map((c) => c.id))
+
 // ---------------------------------------------------------------- Traffic circles
 
 /**

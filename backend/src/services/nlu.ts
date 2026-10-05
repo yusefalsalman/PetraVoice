@@ -113,6 +113,12 @@ A circle is a precise point, not its neighbourhood. Keep «دوار» / "Circle"
 - Numbered circles: «السابع» / «دوار السابع» / «ع السابع» → «الدوار السابع»; "7th circle" / "seventh circle" → "7th Circle". Same for الأول … الثامن.
 - «دوار المدينة» / «المدينة الرياضية» → «دوار المدينة الرياضية»; «الواحة» → «دوار الواحة».
 
+2c) CITIES ARE DESTINATIONS TOO — the app works across Jordan, not only Amman
+A city or town said on its own is the place itself: «من الطفيلة على العقبة» → pickup name «الطفيلة», dropoff name
+«العقبة» (area ""). Same for الكرك، معان، المفرق، إربد، الرمثا، الزرقاء، السلط، مادبا، جرش، عجلون، البتراء / وادي موسى،
+وادي رم، البحر الميت، الأزرق، الشوبك, and "Aqaba", "Karak", "Irbid", "Petra", "Dead Sea"… Never turn a city into a street
+(«شارع العقبة», «شارع الطفيل بن النعمان») and never move it to "area" of another place.
+
 3) FIX SPEECH-TO-TEXT MISTAKES
 Transcripts come from speech recognition and contain acoustic mishearings. If a word sounds like a known
 Jordanian circle, monument, hospital or university, map it to that landmark — never drop it:

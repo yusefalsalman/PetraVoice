@@ -90,7 +90,8 @@ engineering gates. Other gates still reach the driver as a note.
 
 ### 🗺️ Cascading Spatial Geocoding
 0. **Gate & traffic-circle registry** — exact OSM-verified points for gates and Amman's circles
-   (1st–8th, صويلح, الواحة, المدينة الرياضية, «الكيلو» / دوار الحرمين), circle names never shortened
+   (1st–8th, صويلح, الواحة, المدينة الرياضية, «الكيلو» / دوار الحرمين), circle names never shortened —
+   plus **Jordan's cities & towns** (العقبة، الكرك، معان، الطفيلة، المفرق، إربد، الرمثا، البتراء، وادي رم، البحر الميت…)
 1. Local **landmark knowledge base** (SQLite) — malls, hospitals, universities, districts
 2. **OpenStreetMap Nominatim** with LLM-generated search variants (Arabic + official English names)
 3. Keyword stripping + city context · 4. **Photon** fuzzy search (Jordan-only)
@@ -220,7 +221,7 @@ fare is priced per tier → the app shows everything, **reads it back aloud**, a
 | **AI / NLU** | Groq **whisper-large-v3** (speech-to-text) · Groq **gpt-oss-120b** with automatic fallback to **gpt-oss-20b** · rule-based parser as a last resort |
 | **Voice Output** | Microsoft Edge neural TTS via `msedge-tts` (`ar-SA-HamedNeural`, `en-US-ChristopherNeural`) · optional OpenAI `tts-1` · Web Speech API fallback |
 | **Geocoding & Routing** | Gate & traffic-circle registry · Generic-category registry (top-5 «قصدك؟») · Local landmark KB · OpenStreetMap **Nominatim** · **Photon** fuzzy search · **OSRM** routing (encoded polyline) |
-| **Testing** | End-to-end pipeline test (`npm run test:e2e`, 7 rides + TTS) · TypeScript strict mode |
+| **Testing** | End-to-end pipeline test (`npm run test:e2e`, 8 rides + TTS) · TypeScript strict mode |
 | **Demo Infrastructure** | **Cloudflare Quick Tunnels** (`cloudflared`) · QR code CLI (`qrcode-terminal`) · **Playwright** + **FFmpeg** automated demo videos |
 
 <br />
@@ -276,7 +277,8 @@ cd backend
 npm run test:e2e
 ```
 
-Runs realistic requests through the whole pipeline and checks every pin against the registry (within 30 m):
+Runs realistic requests through the whole pipeline and checks every pin against the registry (within 30 m) —
+8 rides + TTS, 84 checks:
 
 | # | Request | Checks |
 | :-- | :-- | :-- |
@@ -287,6 +289,7 @@ Runs realistic requests through the whole pipeline and checks every pin against 
 | 5 | «وصلني ع المستشفى» | «قصدك؟» with the 5 hospitals, in order, at their pins · no fare yet |
 | 6 | "take me to the mall" | the 5 malls with English names |
 | 7 | «إلى مستشفى الخالدي» (a tapped option) | fast path (no LLM) · full route and fare |
+| 8 | «بدي اروح من الطفيلة على العقبة» | city to city outside Amman · town centres, not streets · 200+ km route |
 | + | `/api/tts` Arabic and English | 200 · valid MP3 audio |
 
 Requests are spaced 15 s apart to stay inside Groq's free-tier rate limit.

@@ -1,4 +1,4 @@
-import { JORDAN_CIRCLES } from './geoKnowledge.ts'
+import { JORDAN_CIRCLES, JORDAN_CITIES } from './geoKnowledge.ts'
 
 // Level-1 geocoding: curated Jordanian landmarks with colloquial and English aliases.
 // Coordinates from OpenStreetMap (Nominatim). `name` / `en` are the canonical names returned
@@ -116,7 +116,7 @@ const PLACES: Landmark[] = [
   { id: 'ahu', name: 'جامعة الحسين بن طلال', en: 'Al-Hussein Bin Talal University', aliases: ['الحسين بن طلال'], lat: 30.2594, lng: 35.6843 },
 ]
 
-export const LANDMARKS: Landmark[] = [...PLACES, ...JORDAN_CIRCLES]
+export const LANDMARKS: Landmark[] = [...PLACES, ...JORDAN_CIRCLES, ...JORDAN_CITIES]
 
 /**
  * Generic categories («وصلني ع المستشفى», "take me to the mall") → the «قصدك؟» choice with the
