@@ -137,7 +137,7 @@ function slides({ home, gate, choice, arch, qr, link, linkLabel }) {
     </section>`,
 
     // 5 — Live demo
-    `<section class="slide">${head(5, 'Live Demo', 'Try PetraVoice Live')}
+    `<section class="slide">${head(5, 'Core Demonstration / Key Results', 'Core Demonstration: Live Interactive Validation')}
       <div class="demo">
         <div class="qrbox"><img src="${qr}" alt="QR code"><div class="url">${linkLabel}</div><div class="hint">Scan with your phone camera · allow the microphone</div><div class="code">Code: ${REPO}</div></div>
         <div class="prompts">
