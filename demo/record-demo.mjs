@@ -1,16 +1,14 @@
-// Fully automated ~1-minute demo video: Jordanian voiceover (Edge neural TTS) → Playwright drives
-// the real app through three rides → FFmpeg cuts and merges → backend/demo_video_final.mp4.
+// Clean screen recording of the working MVP → backend/demo_video_final.mp4 (1920×1080, 60 fps).
 //
 //   (backend on :8000 and frontend on :5173 running)
 //   cd demo && npm run record
 //
-// Nothing is typed: each request is played into Chromium's fake microphone, so the app hears it
-// through the real pipeline (mic → Whisper → LLM → gate registry → OSRM). Each ride is its own take;
-// the dead time while the app waits for silence and the server answers is cut out. If Whisper
-// mishears a request, that take falls back to typing it, so the video is always produced.
-//
-// The three rides cover the demo priorities in CLAUDE.md: mic + live waveform, the auto-filled
-// confirmation (gate pin, ride type from speech), and the «قصدك؟» two-choice screen.
+// No narration, captions or title cards: the video opens on the app and contains only what the app
+// does. The only sounds are the rider's spoken request (played into Chromium's fake microphone, so it
+// goes through the real pipeline: mic → Whisper → LLM → gate registry → OSRM) and the app's own
+// spoken replies, captured from its /api/tts responses and placed when the app played them.
+// The dead time while the app waits for silence and the server answers is cut. If Whisper mishears
+// a request, that take falls back to typing it, so a video is always produced.
 
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -22,35 +20,17 @@ import { chromium } from 'playwright'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const APP_URL = process.env.APP_URL ?? 'http://localhost:5173'
-const OUT_DIR = join(HERE, 'demo-recordings')
+const OUT_DIR = join(HERE, 'demo-recordings', 'landscape')
 const AUDIO_DIR = join(OUT_DIR, 'audio')
 const FRAMES_DIR = join(OUT_DIR, 'frames')
 const FINAL = resolve(HERE, '..', 'backend', 'demo_video_final.mp4')
-/** Jordanian male neural voice. */
-const VOICE = 'ar-JO-TaimNeural'
+/** The rider's voice (Jordanian male) — the spoken request fed to the microphone. */
+const RIDER_VOICE = 'ar-JO-TaimNeural'
 /** Page layout size (the app is a phone-width column; 720 px tall keeps the confirm screen in view)… */
 const VIEWPORT = { width: 1280, height: 720 }
 /** …rendered at 1.5× pixel density into a true Full HD video. */
 const SCALE = 1.5
 const VIDEO = { width: VIEWPORT.width * SCALE, height: VIEWPORT.height * SCALE }
-
-// ---------------------------------------------------------------- Script (colloquial Jordanian)
-
-const INTRO = 'مع بترا فويس، احكي وين بدك تروح، والباقي علينا.'
-const OUTRO = 'بوابات ودواوير بدقة، وبنفهم اللهجة الأردنية. بترا فويس، احكي وبس.'
-
-/** Fare the way people say it: 2.45 → «دينارين ونص», 15.6 → «خمسطعش دينار ونص». */
-function jordanianFare(amount) {
-  const r = Math.round(amount * 2) / 2
-  const d = Math.floor(r)
-  const half = r > d ? ' ونص' : ''
-  const W = { 3: 'تلات', 4: 'أربع', 5: 'خمس', 6: 'ست', 7: 'سبع', 8: 'تمن', 9: 'تسع', 10: 'عشر', 11: 'حدعش', 12: 'اطنعش', 13: 'تلطعش', 14: 'أربعطعش', 15: 'خمسطعش', 16: 'ستطعش', 17: 'سبعطعش', 18: 'تمنطعش', 19: 'تسعطعش', 20: 'عشرين' }
-  if (d === 0) return 'نص دينار'
-  if (d === 1) return `دينار${half}`
-  if (d === 2) return `دينارين${half}`
-  if (d <= 10) return `${W[d]} دنانير${half}`
-  return `${W[d] ?? d} دينار${half}`
-}
 
 const RIDES = [
   {
@@ -58,23 +38,20 @@ const RIDES = [
     rider: 'يعطيك العافية، بدي سيارة من مكة مول بوابة 2 لدوار صويلح.',
     expect: (b) => b.pickup?.name?.includes('بوابة 2') && b.dropoff?.name?.includes('صويلح'),
     typed: { pickup: 'مكة مول بوابة 2', dropoff: 'دوار صويلح' },
-    reply: (fare) => `أبشر، من مكة مول بوابة 2 لدوار صويلح، بحدود ${fare}.`,
+    tiers: ['مريح', 'XL عائلي', 'اقتصادي'], // tap through the ride tiers: prices update
   },
   {
     id: 'family',
     rider: 'بدنا سيارة عائلية من الدوار السابع للمطار، واحنا خمس أشخاص.',
     expect: (b) => b.rideType === 'xl' && b.dropoff?.name?.includes('مطار'),
     typed: { pickup: 'الدوار السابع', dropoff: 'مطار الملكة علياء سيارة عائلية' },
-    reply: (fare) => `على راسي، سيارة عائلية للمطار، بحدود ${fare}.`,
   },
   {
     id: 'ambiguous',
     rider: 'وصلني على الجامعة لو سمحت.',
-    expect: (b) => b.needsDisambiguation === true && b.options?.length === 5,
+    expect: (b) => b.needsDisambiguation === true,
     typed: { pickup: '', dropoff: 'الجامعة' },
-    ask: 'أي جامعة حاب تروح عليها؟ اختار من الخيارات.',
     choose: 'الجامعة الأردنية',
-    reply: (fare) => `تمام، ع البوابة الشمالية للأردنية، بحدود ${fare}.`,
     last: true,
   },
 ]
@@ -97,14 +74,13 @@ function duration(file) {
   throw new Error(`could not read the duration of ${file}`)
 }
 
-let ttsCount = 0
-/** Speaks `text` with the Jordanian voice into an mp3; returns { file, seconds }. */
-async function voice(text, name = `line_${++ttsCount}`) {
-  const file = join(AUDIO_DIR, `${name}.mp3`)
+/** The rider's spoken request as an mp3. */
+async function riderVoice(text, name) {
+  const file = join(AUDIO_DIR, `${name}_rider.mp3`)
   const tts = new MsEdgeTTS()
   try {
-    await tts.setMetadata(VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3)
-    const { audioStream } = tts.toStream(text, { rate: '+4%' })
+    await tts.setMetadata(RIDER_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3)
+    const { audioStream } = tts.toStream(text)
     const chunks = []
     for await (const c of audioStream) chunks.push(c)
     writeFileSync(file, Buffer.concat(chunks))
@@ -125,12 +101,12 @@ function micInput(mp3, name) {
 
 const frames = [] // { ts, file } across all takes
 const keep = [] // [from, to] wall-clock ranges that make it into the video, in order
-const cues = [] // { file, ts } voice tracks, wall-clock
+const cues = [] // { file, ts, seconds } audio, wall-clock
 
 /**
- * One browser session per take (the fake microphone plays its file once). Frames are
- * back-to-back screenshots re-rendered at 1.5× — Playwright's recordVideo and the CDP screencast
- * both capture at 1280×720 in headless Chromium whatever the device scale.
+ * One browser session per take (the fake microphone plays its file once). Frames are back-to-back
+ * screenshots re-rendered at 1.5× (Playwright's recordVideo and the CDP screencast both capture at
+ * CSS-pixel size in headless Chromium). The app's spoken replies are saved as they arrive.
  */
 async function take(micWav, run) {
   const browser = await chromium.launch({
@@ -143,6 +119,36 @@ async function take(micWav, run) {
   })
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: SCALE, permissions: ['microphone'], locale: 'ar-JO' })
   const page = await context.newPage()
+
+  // The app's voice: every /api/tts answer is the audio the app plays right then.
+  const spoken = []
+  let waiter = null
+  // (Chromium doesn't keep audio response bodies for Playwright, so the request is passed through
+  // here: the app gets exactly the bytes we save.)
+  await page.route('**/api/tts', async (route) => {
+    const res = await route.fetch()
+    const body = await res.body()
+    await route.fulfill({ response: res, body })
+    if (!res.ok() || body.length < 2000) return
+    const file = join(AUDIO_DIR, `app_${cues.length}_${Date.now()}.mp3`)
+    writeFileSync(file, body)
+    let line
+    try {
+      line = { file, ts: now(), seconds: duration(file) } // playback starts as the reply arrives
+    } catch {
+      return
+    }
+    cues.push(line)
+    spoken.push(line)
+    waiter?.(line)
+  })
+  /** Waits for the app to speak (or returns the line it already spoke since `since`). */
+  const appSpeech = (since, timeout = 12_000) => {
+    const done = spoken.find((l) => l.ts >= since)
+    if (done) return Promise.resolve(done)
+    return Promise.race([new Promise((r) => (waiter = r)), sleep(timeout).then(() => null)])
+  }
+
   const cdp = await context.newCDPSession(page)
   const shot = { format: 'jpeg', quality: 92, optimizeForSpeed: true, clip: { x: 0, y: 0, ...VIEWPORT, scale: SCALE } }
   const screenshot = () =>
@@ -151,6 +157,7 @@ async function take(micWav, run) {
   await page.goto(APP_URL)
   await page.getByRole('button', { name: 'اضغط للتحدث بمشوارك' }).waitFor({ state: 'visible' })
   await page.waitForFunction(() => document.querySelectorAll('.leaflet-tile-loaded').length > 4, null, { timeout: 15_000 })
+  await sleep(400)
 
   let capturing = true
   const capture = (async () => {
@@ -169,7 +176,7 @@ async function take(micWav, run) {
   await sleep(300) // first frame in
 
   try {
-    await run(page)
+    await run(page, appSpeech)
   } finally {
     capturing = false
     await capture
@@ -178,87 +185,81 @@ async function take(micWav, run) {
   }
 }
 
-/** Taps the mic, lets the fake microphone speak, returns the parse response and timings. */
-async function speak(page, rider) {
-  const parsed = page.waitForResponse((r) => r.url().includes('/api/parse-ride'), { timeout: 60_000 })
-  await page.getByRole('button', { name: 'اضغط للتحدث بمشوارك' }).click({ force: true })
-  const mic = now()
-  cues.push({ file: rider.file, ts: mic + 0.45 })
-  const body = await (await parsed).json()
-  return { mic, body }
-}
-
 async function typeInstead(page, typed) {
   await page.getByRole('button', { name: 'إلغاء والبدء من جديد' }).click({ force: true }).catch(() => {})
-  await page.getByRole('textbox', { name: 'من أين؟' }).fill(typed.pickup)
+  if (typed.pickup) await page.getByRole('textbox', { name: 'من أين؟' }).fill(typed.pickup)
   await page.getByRole('textbox', { name: 'إلى أين؟' }).fill(typed.dropoff)
   const retry = page.waitForResponse((r) => r.url().includes('/api/parse-ride'), { timeout: 60_000 })
   await page.getByRole('button', { name: 'ابحث عن رحلة' }).click({ force: true })
   return (await retry).json()
 }
 
+/** Waits for the confirm screen with the route drawn; returns when it first appeared. */
 async function routeOnScreen(page) {
   await page.getByRole('button', { name: 'تأكيد الرحلة' }).waitFor({ state: 'visible', timeout: 30_000 })
+  const shown = now()
   await page.waitForFunction(() => document.querySelectorAll('.leaflet-overlay-pane path').length >= 2, null, { timeout: 15_000 })
-  await sleep(700) // map finishes flying to the route
-  return now()
+  return shown
 }
 
-/** Says `line` over the screen from now, waits for it to finish. */
-async function narrate(line, after = 0.4) {
-  cues.push({ file: line.file, ts: now() + 0.1 })
-  await sleep((line.seconds + after) * 1000)
-}
+/** Lets the app finish speaking `line` (null = it didn't speak). */
+const listen = (line, after = 0.4) => sleep(line ? Math.max(0, line.ts + line.seconds + after - now()) * 1000 : 1500)
 
 // ---------------------------------------------------------------- The three rides
 
-async function recordRide(ride, i, intro, outro) {
-  const rider = await voice(ride.rider, `${ride.id}_rider`)
+async function recordRide(ride) {
+  const rider = await riderVoice(ride.rider, ride.id)
   const micWav = micInput(rider.file, ride.id)
-  ride.rider = Object.assign(rider, { text: ride.rider })
 
-  await take(micWav, async (page) => {
+  await take(micWav, async (page, appSpeech) => {
     const start = now()
-    if (i === 0) await narrate(intro, 0.2)
-    else await sleep(700)
+    await sleep(900) // the home screen, then the tap
 
-    let { mic, body } = await speak(page, ride.rider)
-    log(`  heard «${body.transcript}» → ${body.pickup?.name ?? '—'} ⟶ ${body.dropoff?.name ?? (body.needsDisambiguation ? 'قصدك؟' : '—')} (${body.rideType})`)
-    // Keep the listening bar while the rider talks (+1 s), skip the silence wait and the server call.
-    keep.push([start, mic + 0.45 + ride.rider.seconds + 0.8])
+    // 1. The rider taps the mic and speaks — the waveform reacts live.
+    const parsed = page.waitForResponse((r) => r.url().includes('/api/parse-ride'), { timeout: 60_000 })
+    const tap = now()
+    await page.getByRole('button', { name: 'اضغط للتحدث بمشوارك' }).click({ force: true })
+    cues.push({ file: rider.file, ts: tap + 0.45, seconds: rider.seconds })
+    let body = await (await parsed).json()
+    log(`  heard «${body.transcript}» → ${body.pickup?.name ?? '—'} ⟶ ${body.dropoff?.name ?? (body.needsDisambiguation ? `${body.options.length} options` : '—')} (${body.rideType})`)
+    // Keep the listening bar while the rider talks; cut the silence wait and the server call.
+    keep.push([start, tap + 0.45 + rider.seconds + 0.8])
 
-    let typed = false
     if (!ride.expect(body)) {
       log('  ⚠ not what was asked — typing it instead for this take')
-      typed = true
       body = await typeInstead(page, ride.typed)
     }
 
-    if (ride.ask) {
-      await page.getByRole('heading', { name: 'أي جامعة؟' }).waitFor({ state: 'visible', timeout: 30_000 })
-      const shown = now()
-      keep.push([shown - (typed ? 0 : 0.6), Infinity]) // closed below
-      await narrate(await voice(ride.ask, `${ride.id}_ask`), 0.1)
+    // 2. A vague place: the app asks out loud and shows the choices; the rider taps one.
+    if (ride.choose) {
+      const heading = page.getByRole('heading', { name: /^أي |قصدك/ })
+      await heading.waitFor({ state: 'visible', timeout: 30_000 })
+      const shown = now() - 0.3
+      keep.push([shown, Infinity])
+      await listen(await appSpeech(shown), 0.6)
       const refreshed = page.waitForResponse((r) => r.url().includes('/api/parse-ride'), { timeout: 60_000 })
-      await page.locator('button', { hasText: ride.choose }).first().click({ force: true })
-      keep.at(-1)[1] = now() + 0.7 // the tap on the choice — then skip the wait for the server
+      await page.locator('ul button', { hasText: ride.choose }).first().click({ force: true })
+      keep.at(-1)[1] = now() + 0.5 // the tap — then skip the wait for the server
       body = await (await refreshed).json()
       log(`  chose «${ride.choose}» → ${body.dropoff?.name}`)
-      keep.push([(await routeOnScreen(page)) - 0.3, Infinity])
-    } else {
-      const result = await routeOnScreen(page)
-      keep.push([result - 1.0, Infinity]) // a moment of «جاري فهم طلبك…», then the result
     }
 
-    const fare = body.fareEstimate?.min
-    log(`  fare ${body.fareEstimate?.min}–${body.fareEstimate?.max} JOD → «${jordanianFare(fare)}»`)
-    await narrate(await voice(ride.reply(jordanianFare(fare)), `${ride.id}_reply`), 0.3)
+    // 3. The route, the tiers and the price appear; the app reads the ride back.
+    const shown = await routeOnScreen(page)
+    keep.push([shown - 0.5, Infinity])
+    log(`  fare ${body.fareEstimate?.min}–${body.fareEstimate?.max} JOD (${body.rideType})`)
+    await listen(await appSpeech(shown), 0.5)
+
+    // 4. Tap through the ride tiers: the price changes with each.
+    for (const tier of ride.tiers ?? []) {
+      await page.locator('fieldset button', { hasText: tier }).click({ force: true })
+      await sleep(1100)
+    }
 
     if (ride.last) {
-      // Closing shot: pull the sheet down so the whole route fills the screen.
+      // Pull the sheet down to show the whole route on the map.
       await page.getByRole('button', { name: 'إخفاء التفاصيل لعرض الخريطة كاملة' }).click({ force: true })
-      await sleep(600)
-      await narrate(outro, 0.8)
+      await sleep(2500)
     }
     keep.at(-1)[1] = now()
   })
@@ -298,8 +299,11 @@ function merge() {
 
   const total = keep.reduce((s, [a, b]) => s + (b - a), 0)
   const inputs = cues.flatMap((c) => ['-i', c.file])
-  const delays = cues.map((c, i) => `[${i + 1}:a]adelay=${Math.round(videoTime(c.ts) * 1000)}:all=1[a${i}]`)
-  const filter = `${delays.join(';')};${cues.map((_, i) => `[a${i}]`).join('')}amix=inputs=${cues.length}:normalize=0:duration=longest[aout]`
+  const tracks = cues.map(
+    (c, i) =>
+      `[${i + 1}:a]afade=t=in:d=0.04,afade=t=out:st=${Math.max(0, c.seconds - 0.08).toFixed(2)}:d=0.08,adelay=${Math.round(videoTime(c.ts) * 1000)}:all=1[a${i}]`,
+  )
+  const filter = `${tracks.join(';')};${cues.map((_, i) => `[a${i}]`).join('')}amix=inputs=${cues.length}:normalize=0:duration=longest[aout]`
 
   ffmpeg([
     '-f', 'concat', '-safe', '0', '-i', list,
@@ -307,22 +311,22 @@ function merge() {
     '-filter_complex', filter,
     '-map', '0:v', '-map', '[aout]',
     '-t', total.toFixed(2),
-    // Constant 60 fps from the screenshot frames (≈9–14 real frames per second; the rest repeat).
+    // Constant 60 fps from the screenshot frames (≈10 real frames per second; the rest repeat).
     '-vf', `scale=${VIDEO.width}:${VIDEO.height}:flags=lanczos,fps=60`,
-    '-c:v', 'libx264', '-preset', 'slow', '-b:v', '6000k', '-maxrate', '8000k', '-bufsize', '12000k', '-pix_fmt', 'yuv420p', '-r', '60',
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', '60',
     '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
     '-movflags', '+faststart',
     FINAL,
   ])
-  writeFileSync(join(OUT_DIR, 'timeline.json'), JSON.stringify({ keep, cues: cues.map((c) => ({ ...c, at: videoTime(c.ts) })) }, null, 2))
+  writeFileSync(join(OUT_DIR, 'timeline.json'), JSON.stringify({ total, keep, cues: cues.map((c) => ({ ...c, at: videoTime(c.ts) })) }, null, 2))
 }
 
 // ---------------------------------------------------------------- run
 
 setTimeout(() => {
-  console.error('Timed out after 6 minutes — see the last step logged above.')
+  console.error('Timed out after 8 minutes — see the last step logged above.')
   process.exit(1)
-}, 360_000).unref()
+}, 480_000).unref()
 
 const health = await fetch(`${APP_URL}/api/health`).then((r) => r.json()).catch(() => null)
 if (!health?.ok) {
@@ -333,13 +337,11 @@ rmSync(OUT_DIR, { recursive: true, force: true })
 mkdirSync(AUDIO_DIR, { recursive: true })
 mkdirSync(FRAMES_DIR, { recursive: true })
 
-log('voiceover: intro + outro…')
-const intro = await voice(INTRO, 'intro')
-const outro = await voice(OUTRO, 'outro')
 for (const [i, ride] of RIDES.entries()) {
   log(`take ${i + 1}/${RIDES.length}: «${ride.rider}»`)
-  await recordRide(ride, i, intro, outro)
+  await recordRide(ride)
 }
-log(`merging ${frames.length} frames and ${cues.length} voice tracks…`)
+const appLines = cues.filter((c) => c.file.includes('app_')).length
+log(`merging ${frames.length} frames, ${cues.length - appLines} spoken requests and ${appLines} app replies…`)
 merge()
 log(`done → ${FINAL}  (${(statSync(FINAL).size / 1e6).toFixed(1)} MB, ${duration(FINAL).toFixed(1)} s)`)
