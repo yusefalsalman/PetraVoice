@@ -47,7 +47,7 @@ Each run (~3–5 min, 4 Groq requests):
 
 1. Generates the Jordanian voiceover with Edge neural TTS (`ar-JO-TaimNeural`).
 2. Records three real voice bookings in headless Chromium — each request is played into the **fake
-   microphone**, so it goes through Whisper and the LLM like a real rider: Mecca Mall **Gate 2** → Sweileh
+   microphone**, so it goes through Whisper and the LLM like a real rider: **Mecca Mall (Gate 2)** → Sweileh
    Circle, a **Family XL** ride to the airport, and «وصلني على الجامعة» → the **«أي جامعة؟»** choice.
 3. Speaks each reply with the **real fare** of that run, said the Jordanian way.
 4. Cuts the dead time and merges everything with FFmpeg (`ffmpeg-static`). The vertical cut adds

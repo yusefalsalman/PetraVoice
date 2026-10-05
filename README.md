@@ -280,7 +280,7 @@ Runs realistic requests through the whole pipeline and checks every pin against 
 
 | # | Request | Checks |
 | :-- | :-- | :-- |
-| 1 | «بدي سيارة من مكة مول بوابة 2 لدوار صويلح» | pin on Mecca Mall Gate 2 · «دوار» kept · Sweileh Circle |
+| 1 | «بدي سيارة من مكة مول بوابة 2 لدوار صويلح» | pin on Mecca Mall (Gate 2) · «دوار» kept · Sweileh Circle |
 | 2 | «وصلني على الجامعة الأردنية البوابة الشمالية» | current-location pickup · UJ North Gate |
 | 3 | «خذني على دوار الكيلو» | nickname → Kilo (Al-Haramain) Circle |
 | 4 | "I need an economy ride from City Mall to Seventh Circle" | English names · economy · 7th Circle |
@@ -360,7 +360,7 @@ npm run record:vertical     # → backend/demo_video_vertical_final.mp4  (vertic
 1. **Voiceover** — colloquial Jordanian lines spoken by `ar-JO-TaimNeural` (Edge neural TTS).
 2. **Three real voice bookings** — each request is played into Chromium's fake microphone, so the app hears
    it through the real pipeline (mic → Whisper → LLM → registry → OSRM):
-   - «يعطيك العافية، بدي سيارة من مكة مول بوابة 2 لدوار صويلح» → pin on **Gate 2** → Sweileh Circle
+   - «يعطيك العافية، بدي سيارة من مكة مول بوابة 2 لدوار صويلح» → pin on **Mecca Mall (Gate 2)** → Sweileh Circle
    - «بدنا سيارة عائلية من الدوار السابع للمطار، واحنا خمس أشخاص» → **Family XL** picked from speech
    - «وصلني على الجامعة لو سمحت» → **«أي جامعة؟»** with five choices → الجامعة الأردنية
 3. **Spoken replies** use the **real fare of each run**, said the Jordanian way («دينارين ونص», «ستطعش دينار»).

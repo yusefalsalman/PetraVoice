@@ -99,7 +99,7 @@ function slides({ home, gate, choice, arch, qr, link, linkLabel }) {
           <li><b>Ride tiers &amp; live pricing</b> — Economy, Comfort and Family XL priced per trip; a tier said out loud is pre-selected.</li>
           <li><b>Safety by design</b> — the app reads the ride back, but books only after the rider taps confirm.</li>
         </ul>
-        <div class="phones">${phone(gate, 'Gate 2 → Sweileh Circle, priced')}${phone(choice, `${ar('«أي جامعة؟»')} — five options`)}</div>
+        <div class="phones">${phone(gate, 'Mecca Mall (Gate 2) → Sweileh Circle, priced')}${phone(choice, `${ar('«أي جامعة؟»')} — five options`)}</div>
       </div>
     </section>`,
 
@@ -156,7 +156,7 @@ function slides({ home, gate, choice, arch, qr, link, linkLabel }) {
       <div class="cols3">
         <div class="col green"><h3>✅ What we tested</h3><ul>
           <li>Automated end-to-end suite: <b>9 / 9 passing</b>, every pin checked to within 30 m</li>
-          <li>Gate pins: Mecca Mall Gate 2, UJ North Gate; circles incl. Sweileh and ${ar('الكيلو')}</li>
+          <li>Gate pins: Mecca Mall (Gate 2), UJ North Gate; circles incl. Sweileh and ${ar('الكيلو')}</li>
           <li>Dialect, fillers and nicknames; English requests; ride type from speech</li>
           <li>Generic places: 5 hospitals / 5 malls; tapped choice answered without the LLM</li>
           <li>Real speech through the mic pipeline — Whisper transcripts word-for-word</li>
@@ -214,7 +214,7 @@ const CSS = String.raw`
   .phone { display: flex; flex-direction: column; align-items: center; gap: 14px; }
   .frame { width: 300px; height: 650px; border-radius: 44px; padding: 10px; background: var(--navy); box-shadow: 0 24px 60px rgb(15 23 42 / .28); }
   .frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 34px; display: block; }
-  figcaption { font-size: 19px; font-weight: 700; color: var(--muted); }
+  figcaption { font-size: 19px; font-weight: 700; color: var(--muted); max-width: 320px; text-align: center; line-height: 1.35; }
 
   .flow { display: flex; align-items: stretch; gap: 14px; margin-top: 64px; }
   .step { flex: 1; background: #fff; border: 1px solid var(--line); border-radius: 24px; padding: 30px 26px; position: relative; box-shadow: 0 10px 30px rgb(15 23 42 / .06); }
