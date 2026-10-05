@@ -42,6 +42,8 @@
 
 <br />
 
+> 🧪 **Judges:** six sentences to try live, Arabic and English → [TEST-EXAMPLES.md](TEST-EXAMPLES.md)
+
 ## 📌 Executive Summary
 
 **PetraVoice** is a resilient, hands-free voice booking assistant built for on-demand mobility in Jordan.
