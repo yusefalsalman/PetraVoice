@@ -49,9 +49,9 @@ const PLACES: Landmark[] = [
     lat: 31.9649,
     lng: 35.9041,
   },
-  { id: 'citymall', name: 'سيتي مول', en: 'City Mall', aliases: [], lat: 31.9805, lng: 35.838 },
-  { id: 'mecca', name: 'مكة مول', en: 'Mecca Mall', aliases: ['مكه مول', 'Makkah Mall'], lat: 31.9777, lng: 35.8439 },
-  { id: 'taj', name: 'تاج مول', en: 'Taj Mall', aliases: [], lat: 31.9412, lng: 35.8881 },
+  { id: 'citymall', name: 'سيتي مول', en: 'City Mall', aliases: ['مول سيتي', 'السيتي مول'], lat: 31.9805, lng: 35.838 },
+  { id: 'mecca', name: 'مكة مول', en: 'Mecca Mall', aliases: ['مكه مول', 'مول مكة', 'مول مكه', 'Makkah Mall'], lat: 31.9777, lng: 35.8439 },
+  { id: 'taj', name: 'تاج مول', en: 'Taj Mall', aliases: ['مول تاج', 'التاج مول'], lat: 31.9412, lng: 35.8881 },
   {
     id: 'roman',
     name: 'المدرج الروماني - وسط البلد',
@@ -99,8 +99,8 @@ const PLACES: Landmark[] = [
   { id: 'isc', name: 'مدارس الكلية العلمية الإسلامية', en: 'Islamic Scientific College School', aliases: ['الكلية العلمية الإسلامية', 'الكلية العلمية', 'ISC'], lat: 31.9524, lng: 35.9139 },
   { id: 'modern-systems', name: 'مدارس النظم الحديثة', en: 'Modern Systems Schools', aliases: ['النظم الحديثة', 'Modern Systems School'], lat: 31.9989, lng: 35.8716 },
   { id: 'ahliyyah', name: 'المدرسة الأهلية للبنات', en: 'Ahliyyah School for Girls', aliases: ['الأهلية', 'المدارس الأهلية', 'Ahliyyah School'], lat: 31.9484, lng: 35.9297 },
-  { id: 'abdali-mall', name: 'العبدلي مول', en: 'Abdali Mall', aliases: ['The Abdali Mall'], lat: 31.9635, lng: 35.9083 },
-  { id: 'galleria', name: 'جاليريا مول', en: 'Galleria Mall', aliases: ['الجاليريا', 'غاليريا مول'], lat: 31.9593, lng: 35.8623 },
+  { id: 'abdali-mall', name: 'العبدلي مول', en: 'Abdali Mall', aliases: ['مول العبدلي', 'The Abdali Mall'], lat: 31.9635, lng: 35.9083 },
+  { id: 'galleria', name: 'جاليريا مول', en: 'Galleria Mall', aliases: ['الجاليريا', 'غاليريا مول', 'مول الجاليريا', 'جاليريا'], lat: 31.9593, lng: 35.8623 },
 
   // Universities across Jordan — several exist on OSM only under their English name,
   // so an Arabic Nominatim search can't find them.
