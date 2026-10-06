@@ -253,8 +253,7 @@ npm run dev
 ```
 
 > [!TIP]
-> No key yet? Typed requests still work through the built-in rule-based parser, and
-> `VITE_USE_MOCK=true` in `frontend/.env.local` runs the whole UI without a backend.
+> No key yet? Typed requests still work through the built-in rule-based parser.
 
 ### 3 · Voice settings (optional)
 

@@ -7,17 +7,10 @@ npm install
 npm run dev        # http://localhost:5173 (proxies /api → http://localhost:8000)
 ```
 
-## Mock vs real backend
+## Backend
 
-`.env.local` (copy from `.env.example`):
-
-- `VITE_USE_MOCK=true` — no backend needed; responses come from `src/lib/mockData.ts` after 1.2s.
-  - Typed text is parsed against 17 real Amman landmarks (e.g. العبدلي، سيتي مول، الدوار السابع، المطار) with real
-    OSRM routes precomputed in `src/lib/mockRoutes.json`. «الجامعة» / «المول» trigger the «قصدك؟» screen.
-  - Recorded audio has no STT in mock mode — it always returns the fixed الواحة → الاستقلال ride.
-  - `?mock=ambiguous` — forces the "قصدك؟" two-choice case
-  - `?mock=error` — forces an `STT_FAILED` error
-- `VITE_USE_MOCK=false` — real calls to the Node.js backend. Restart `npm run dev` after changing it.
+The app needs the backend running on `http://localhost:8000` (`cd ../backend && npm run dev`). `.env.local` (copy from
+`.env.example`) only sets `VITE_API_BASE` — leave it at `/api` so the dev server proxies to the backend.
 
 ## Notes
 

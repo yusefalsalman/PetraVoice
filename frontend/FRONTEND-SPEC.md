@@ -48,8 +48,7 @@ frontend/
 │   │   └── api.ts             # TS types mirroring the API contract exactly
 │   ├── lib/
 │   │   ├── recorder.ts        # MediaRecorder + AnalyserNode wrapper
-│   │   ├── api.ts             # parseRide() / confirmRide() + mock mode
-│   │   └── mockData.ts        # success case + ambiguous case
+│   │   └── api.ts             # parseRide() / confirmRide()
 │   ├── screens/
 │   │   ├── HomeScreen.tsx     # mic button + waveform
 │   │   ├── ProcessingScreen.tsx
@@ -62,7 +61,7 @@ frontend/
 │       ├── LocationRow.tsx    # icon + place name + confidence badge
 │       ├── MapPreview.tsx     # leaflet: two markers + decoded route polyline
 │       └── FareCard.tsx
-└── .env.local                 # VITE_API_BASE=/api  and  VITE_USE_MOCK=true
+└── .env.local                 # VITE_API_BASE=/api
 ```
 
 ---
@@ -94,8 +93,8 @@ idle ──tap──> recording ──stop──> processing ──┐
 - 32–40 bars, each bar's height driven by its frequency bin, rounded caps, smooth motion.
 - Cancel the animation frame on unmount.
 
-### 4.3 Mock Mode (`lib/api.ts`)
-When `VITE_USE_MOCK=true`, return data from `mockData.ts` after a simulated 1200ms delay instead of hitting the network. This lets every screen be built before the backend exists. Support `?mock=ambiguous` in the URL to force the ambiguity case for testing.
+### 4.3 API Layer (`lib/api.ts`)
+Calls the backend (`VITE_API_BASE`, default `/api`, proxied to `http://localhost:8000` by Vite). A network failure or a malformed body comes back as a `SERVER_ERROR` response, so the screens only ever handle the contract's shapes.
 
 ### 4.4 Confirmation Screen
 Shows: the transcript as understood, pickup, dropoff, map preview, fare estimate, ride-type selector (economy/comfort/xl), and a large confirm button. Each location must be manually editable — if the AI got it wrong, the user corrects that one field instead of starting over. **Never auto-book.**
@@ -126,12 +125,12 @@ Renders the 2–5 options as tappable cards (category icon, name, area) under a 
 Implement in this order and stop after each phase so it can be tested:
 
 1. **Setup** — Vite + Tailwind + RTL + font + theme. An empty screen carrying the visual identity.
-2. **Types, store, mock layer** — `types/api.ts` matching the contract, zustand store, api layer with mock mode.
+2. **Types, store, API layer** — `types/api.ts` matching the contract, zustand store, api layer.
 3. **Home screen** — mic button + real recording + live waveform. The most important phase visually.
-4. **Confirmation screen** — fed from mock data, no map yet.
+4. **Confirmation screen** — fed from the backend response, no map yet.
 5. **Disambiguation + dispatched screens** — closes the full demo loop.
 6. **Map** — react-leaflet on the confirmation screen.
-7. **Real integration** — flip `VITE_USE_MOCK` to false and test against the backend.
+7. **Real integration** — test every flow end to end against the backend.
 
 Phases 1–5 are the demo. 6 and 7 are enhancements.
 

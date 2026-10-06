@@ -8,7 +8,6 @@ import { isCurrentLocation, splitNotes } from './location'
 // otherwise — or if it is slow — the browser's own speechSynthesis with a male voice.
 // It only describes the ride — booking still needs the rider's tap on «تأكيد الرحلة».
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
 const STORAGE_KEY = 'pv-voice'
 
@@ -121,7 +120,6 @@ export function choicePrompt(category: PlaceCategory | null, field: 'pickup' | '
  */
 let serverTts: Promise<boolean> | null = null
 function hasServerTts(): Promise<boolean> {
-  if (USE_MOCK) return Promise.resolve(false)
   serverTts ??= fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(4000) })
     .then((r) => (r.ok ? r.json() : null))
     .then((h: { tts?: string } | null) => typeof h?.tts === 'string' && h.tts !== 'browser')
