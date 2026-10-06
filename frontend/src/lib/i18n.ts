@@ -72,6 +72,10 @@ const ar = {
   to: 'إلى:',
   bookingId: 'رقم الحجز:',
   newRide: 'طلب رحلة جديدة',
+  notUnderstood: 'لم يتم فهمك',
+  somethingWrong: 'حدث خطأ',
+  recordAgain: 'أعد التسجيل',
+  close: 'إغلاق',
 
   /** Only used for errors raised in the browser; API errors keep the backend's Arabic message. */
   errors: {
@@ -148,6 +152,10 @@ const en: Strings = {
   to: 'To:',
   bookingId: 'Booking ID:',
   newRide: 'Book a new ride',
+  notUnderstood: "Sorry, I didn't catch that",
+  somethingWrong: 'Something went wrong',
+  recordAgain: 'Record again',
+  close: 'Close',
 
   errors: {
     MIC_DENIED: 'Microphone access was blocked. Allow it in your browser settings and try again.',
@@ -156,7 +164,7 @@ const en: Strings = {
     INVALID_AUDIO: 'No audio was recorded. Please try again.',
     NO_SPEECH: "I didn't hear anything. Tap the mic and speak clearly.",
     STT_FAILED: "Couldn't understand the audio. Please try again.",
-    NO_LOCATION_FOUND: "Couldn't recognise one of the places. Try a well-known landmark nearby.",
+    NO_LOCATION_FOUND: "I couldn't understand where you want to go. Please record again and say your destination.",
     SERVER_ERROR: 'Something went wrong on the server. Please try again.',
   },
 }

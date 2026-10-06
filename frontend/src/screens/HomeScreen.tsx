@@ -1,8 +1,15 @@
-import { AlertCircle, MapPin } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { AlertCircle, MapPin, Mic } from 'lucide-react'
+import { useEffect } from 'react'
 import { LocationCard } from '../components/LocationRow'
 import MicButton from '../components/MicButton'
 import { errorText, QUICK_DESTINATIONS, useLang, useT } from '../lib/i18n'
-import { useRideStore } from '../store/useRideStore'
+import { speak } from '../lib/speech'
+import { useRideStore, type UiError } from '../store/useRideStore'
+
+/** Errors where recording again is the fix (not a blocked or missing microphone). */
+const RETRYABLE = ['STT_FAILED', 'NO_LOCATION_FOUND', 'NO_SPEECH', 'INVALID_AUDIO', 'SERVER_ERROR']
+const NOT_UNDERSTOOD = ['STT_FAILED', 'NO_LOCATION_FOUND', 'NO_SPEECH', 'INVALID_AUDIO']
 
 export default function HomeScreen() {
   const t = useT()
@@ -13,6 +20,7 @@ export default function HomeScreen() {
   const resolveNames = useRideStore((s) => s.resolveNames)
   const startRecording = useRideStore((s) => s.startRecording)
   const stopRecording = useRideStore((s) => s.stopRecording)
+  const dismissError = useRideStore((s) => s.dismissError)
   const recording = status === 'recording'
 
   return (
@@ -42,12 +50,16 @@ export default function HomeScreen() {
         </div>
       </section>
 
-      {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-800 ring-1 ring-red-200">
-          <AlertCircle className="mt-0.5 size-5 shrink-0 text-danger" aria-hidden />
-          <p>{errorText(t, error)}</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <ErrorDialog
+            key={error.code + error.message}
+            error={error}
+            onRetry={() => void startRecording()}
+            onClose={dismissError}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Speak-your-trip button, pinned to the bottom of the sheet. */}
       <div className="sticky bottom-0 -mx-4 bg-gradient-to-t from-bg from-60% to-transparent px-4 pb-5 pt-4">
@@ -61,5 +73,73 @@ export default function HomeScreen() {
         </p>
       </div>
     </div>
+  )
+}
+
+/** Small dialog over the home screen: what went wrong, said out loud, with «أعد التسجيل». */
+function ErrorDialog({ error, onRetry, onClose }: { error: UiError; onRetry: () => void; onClose: () => void }) {
+  const t = useT()
+  const lang = useLang((s) => s.lang)
+  const message = errorText(t, error)
+  const retryable = RETRYABLE.includes(error.code)
+
+  useEffect(() => {
+    if (!retryable) return
+    const timer = setTimeout(() => void speak(message, lang), 250)
+    return () => clearTimeout(timer)
+  }, [message, lang, retryable])
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[2000] grid place-items-center bg-black/40 p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="error-title"
+        aria-describedby="error-message"
+        className="w-full max-w-sm rounded-3xl bg-surface p-6 text-center shadow-2xl"
+        initial={{ scale: 0.92, y: 12 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.92, y: 12 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="mx-auto grid size-14 place-items-center rounded-full bg-red-50 text-danger ring-1 ring-red-200">
+          <AlertCircle className="size-7" aria-hidden />
+        </span>
+        <h3 id="error-title" className="mt-3 text-lg font-bold text-fg">
+          {NOT_UNDERSTOOD.includes(error.code) ? t.notUnderstood : t.somethingWrong}
+        </h3>
+        <p id="error-message" className="mt-1 text-sm text-muted">
+          {message}
+        </p>
+        <div className="mt-5 flex flex-col gap-2">
+          {retryable && (
+            <button
+              type="button"
+              autoFocus
+              onClick={onRetry}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-accent font-bold text-accent-ink shadow-lg shadow-accent/25 outline-none transition hover:bg-accent-hover focus-visible:ring-4 focus-visible:ring-accent/30 active:scale-[0.98]"
+            >
+              <Mic className="size-5" aria-hidden />
+              {t.recordAgain}
+            </button>
+          )}
+          <button
+            type="button"
+            autoFocus={!retryable}
+            onClick={onClose}
+            className="min-h-11 rounded-2xl font-semibold text-muted transition hover:bg-surface-2 hover:text-fg"
+          >
+            {t.close}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }

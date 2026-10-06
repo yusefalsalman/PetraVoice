@@ -128,6 +128,14 @@ parseRideRouter.post('/parse-ride', upload.single('audio'), async (req, res) => 
       : pickupRes?.kind === 'ambiguous'
         ? { field: 'pickup' as const, options: pickupRes.options }
         : null
+  // Nothing usable («مرحبا كيفك», noise Whisper turned into words, or a name no level could find):
+  // no ride to show, so the app asks the rider to record again.
+  if (!ambiguous && !dropoff && !(pickup && pickup.source !== 'current')) {
+    const named = ex.pickup || ex.dropoff
+    console.warn(`[parse-ride] nothing understood in «${transcript}»`)
+    throw new ApiError('NO_LOCATION_FOUND', named ? undefined : 'لم أفهم طلبك. أعد التسجيل من فضلك وقل وين بدك تروح.')
+  }
+
   // Contract: confidence < 0.75 must ask. The cascade never returns a found place below
   // 0.75 (approximate area centres sit exactly on it), so only real ambiguity asks.
 

@@ -70,6 +70,8 @@ interface RideState {
   setRideType: (rideType: RideType) => void
   confirm: () => Promise<void>
   reset: () => void
+  /** Closes the error dialog and goes back to the idle home screen. */
+  dismissError: () => void
 }
 
 const initial = {
@@ -246,6 +248,8 @@ export const useRideStore = create<RideState>()((set, get) => {
       if (res.success) set({ submitting: false, booking: res, status: 'dispatched' })
       else set({ submitting: false, error: res.error })
     },
+
+    dismissError: () => set({ error: null, status: 'idle' }),
 
     reset: () => {
       requestId++
