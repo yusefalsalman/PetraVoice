@@ -1,11 +1,41 @@
 /**
- * The rider's default pickup when they don't name one ("current location").
- * Fixed to central Amman (دوار الداخلية) for the demo — no GPS prompt.
- * The name is sent as-is in /api/confirm-ride; the UI shows a translated label instead.
+ * The rider's default pickup when they don't name one ("current location") and the phone gave no
+ * GPS fix: central Amman (دوار الداخلية). With a fix the backend answers «موقعي الحالي» at the
+ * phone's position instead. The UI shows a translated label for either.
  */
 export const CURRENT_LOCATION = { name: 'موقعي الحالي (عمان)', lat: 31.9725, lng: 35.9098 } as const
 
-export const isCurrentLocation = (name: string | undefined) => name === CURRENT_LOCATION.name
+export const isCurrentLocation = (name: string | undefined) => !!name?.startsWith('موقعي الحالي')
+
+let here: { lat: number; lng: number } | null = null
+let locating: Promise<{ lat: number; lng: number } | null> | null = null
+
+/**
+ * The phone's position for «من بيتي» / «من موقعي» / no pickup said. Asks once (the browser shows
+ * its own permission prompt — HTTPS or localhost only), then reuses the fix. Never throws:
+ * null when refused or unavailable, and the backend falls back to the fixed Amman point.
+ */
+export function locateRider(): Promise<{ lat: number; lng: number } | null> {
+  if (here) return Promise.resolve(here)
+  if (!('geolocation' in navigator)) return Promise.resolve(null)
+  locating ??= new Promise((resolve) =>
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        here = { lat: p.coords.latitude, lng: p.coords.longitude }
+        resolve(here)
+      },
+      () => {
+        locating = null // refused or timed out — a later request may ask again
+        resolve(null)
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
+    ),
+  )
+  return locating
+}
+
+/** The last GPS fix, if any. */
+export const riderPosition = () => here
 
 /**
  * The backend appends gate / entrance notes to `name` after « • » («مكة مول • بوابة 2») — the

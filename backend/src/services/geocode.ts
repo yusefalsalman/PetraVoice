@@ -301,7 +301,19 @@ function sameKind(query: string, hitName: string): boolean {
 
 // ---------------------------------------------------------------- Public
 
-export const currentLocation = (): Candidate => ({ ...CURRENT_LOCATION, confidence: 1, source: 'current' })
+/**
+ * The rider's location: the phone's GPS when the app sent it, else the fixed demo point in Amman.
+ * «من بيتي» / "from my house" count as here too — there is no saved home address.
+ */
+export const currentLocation = (here?: LatLng | null): Candidate =>
+  here
+    ? { name: 'موقعي الحالي', lat: here.lat, lng: here.lng, confidence: 1, source: 'current' }
+    : { ...CURRENT_LOCATION, confidence: 1, source: 'current' }
+
+export interface LatLng {
+  lat: number
+  lng: number
+}
 
 const CURRENT_PHRASES = CURRENT_LOCATION_PHRASES.map(normalizeArabic)
 
@@ -359,11 +371,11 @@ const areaSpellings = (area: string) => uniqueBy([area, area.startsWith('ال') 
  * When the rider named an area, matches outside it are skipped, and a match that is
  * just the area itself is labelled approximate rather than passed off as exact.
  */
-export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar'): Promise<Resolution> {
+export async function resolvePlace(q: PlaceQuery, lang: Lang = 'ar', here?: LatLng | null): Promise<Resolution> {
   const spoken = normalizeArabic(q.name)
   if (!spoken) return { kind: 'not_found' }
-  if (CURRENT_PHRASES.includes(spoken) || spoken === normalizeArabic(CURRENT_LOCATION.name)) {
-    return { kind: 'found', place: currentLocation() }
+  if (CURRENT_PHRASES.includes(spoken) || spoken.startsWith(normalizeArabic('موقعي الحالي'))) {
+    return { kind: 'found', place: currentLocation(here) }
   }
 
   // With an area the rider said, search "<place> <area>" first; the bare name (which may be a

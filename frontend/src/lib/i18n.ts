@@ -30,7 +30,7 @@ const ar = {
 
   pickupLabel: 'من أين؟',
   dropoffLabel: 'إلى أين؟',
-  currentLocation: 'موقعي الحالي (عمان)',
+  currentLocation: 'موقعي الحالي',
   dropoffPlaceholder: 'إلى أين؟',
   findRide: 'ابحث عن رحلة',
   updateRoute: 'تحديث المسار',
@@ -110,7 +110,7 @@ const en: Strings = {
 
   pickupLabel: 'From?',
   dropoffLabel: 'Where to?',
-  currentLocation: 'Current location (Amman)',
+  currentLocation: 'My current location',
   dropoffPlaceholder: 'Where to?',
   findRide: 'Find a ride',
   updateRoute: 'Update route',

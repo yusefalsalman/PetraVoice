@@ -6,6 +6,7 @@ import type {
   ParseRideInput,
   ParseRideResponse,
 } from '../types/api'
+import { locateRider } from './location'
 
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE ?? '/api',
@@ -27,6 +28,13 @@ export async function parseRide(input: ParseRideInput): Promise<ParseRideRespons
   const form = new FormData()
   if (input.text) form.append('text', input.text)
   else if (input.audio) form.append('audio', input.audio, 'recording.webm')
+  // The phone's position for «من بيتي» / «من موقعي». Usually ready already (asked when the mic
+  // was tapped); never hold the request up for long if the rider hasn't answered the prompt.
+  const here = await Promise.race([locateRider(), new Promise<null>((r) => setTimeout(() => r(null), 1500))])
+  if (here) {
+    form.append('lat', String(here.lat))
+    form.append('lng', String(here.lng))
+  }
 
   try {
     const { data } = await http.post('/parse-ride', form)

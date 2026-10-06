@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { confirmRide, parseRide } from '../lib/api'
 import { useLang } from '../lib/i18n'
-import { CURRENT_LOCATION, isCurrentLocation } from '../lib/location'
+import { CURRENT_LOCATION, isCurrentLocation, locateRider, riderPosition } from '../lib/location'
 import { MicError, startRecording, watchSilence, type Recording } from '../lib/recorder'
 import { stopSpeaking } from '../lib/speech'
 import type {
@@ -120,7 +120,9 @@ export const useRideStore = create<RideState>()((set, get) => {
   function apply(res: ParseRideSuccess, keepManualRideType = false) {
     // No pickup named (and none to choose between) → the rider's current location.
     const pickupAsked = res.options.some((o) => o.field === 'pickup')
-    const pickup = res.pickup ?? (pickupAsked ? null : { ...CURRENT_LOCATION, confidence: 1 })
+    const gps = riderPosition()
+    const here = gps ? { name: 'موقعي الحالي', ...gps } : CURRENT_LOCATION
+    const pickup = res.pickup ?? (pickupAsked ? null : { ...here, confidence: 1 })
     const asking = res.needsDisambiguation && res.options.length > 0
     const complete = !asking && pickup !== null && res.dropoff !== null && res.fareEstimate !== null
     set({
@@ -167,6 +169,7 @@ export const useRideStore = create<RideState>()((set, get) => {
     startRecording: async () => {
       if (get().status === 'recording') return
       stopSpeaking() // the mic must not hear the app talking
+      void locateRider() // in a tap, so the location prompt shows; ready by the time the rider stops
       requestId++ // drop any in-flight parse
       set({ ...initial, status: 'recording' })
       try {

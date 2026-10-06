@@ -8,7 +8,7 @@ import {
 import { findGate, GATED_LANDMARKS } from '../data/geoKnowledge.ts'
 import { ApiError } from '../errors.ts'
 import { straightLineKm } from '../lib/text.ts'
-import { currentLocation, resolvePlace, type Candidate, type Lang, type PlaceQuery, type Resolution } from '../services/geocode.ts'
+import { currentLocation, resolvePlace, type Candidate, type Lang, type LatLng, type PlaceQuery, type Resolution } from '../services/geocode.ts'
 import { correctTranscript, extractRide } from '../services/nlu.ts'
 import { fareFor } from '../services/pricing.ts'
 import { fetchRoute } from '../services/routing.ts'
@@ -68,16 +68,29 @@ async function resolveOrDefault(
   query: PlaceQuery | null,
   lang: Lang,
   fallback: () => Candidate | null,
+  here: LatLng | null,
 ): Promise<Resolution | null> {
-  if (query) return resolvePlace(query, lang)
+  if (query) return resolvePlace(query, lang, here)
   const place = fallback()
   return place ? { kind: 'found', place } : null
+}
+
+/** Jordan's bounding box, with a margin — a GPS fix outside it is ignored (fixed demo point instead). */
+const inJordan = (p: LatLng) => p.lat > 29 && p.lat < 33.5 && p.lng > 34.8 && p.lng < 39.5
+
+/** The phone's GPS fix, sent as optional `lat` / `lng` form fields next to `audio` / `text`. */
+function riderPosition(body: Record<string, unknown> | undefined): LatLng | null {
+  const lat = Number(body?.lat)
+  const lng = Number(body?.lng)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || body?.lat === undefined || body?.lng === undefined) return null
+  return inJordan({ lat, lng }) ? { lat, lng } : null
 }
 
 export const parseRideRouter = Router()
 
 parseRideRouter.post('/parse-ride', upload.single('audio'), async (req, res) => {
   const text = typeof req.body?.text === 'string' ? req.body.text.trim() : ''
+  const here = riderPosition(req.body)
 
   // 1. Transcript: `text` skips STT (contract).
   let transcript: string
@@ -102,8 +115,8 @@ parseRideRouter.post('/parse-ride', upload.single('audio'), async (req, res) => 
   //    Location problems never fail the request: an unresolvable side comes back null and the
   //    app asks the rider to fill it in (confirm-ride still requires both).
   const [pickupRes, dropoffRes] = await Promise.all([
-    resolveOrDefault(ex.pickup, ex.language, currentLocation),
-    resolveOrDefault(ex.dropoff, ex.language, () => null),
+    resolveOrDefault(ex.pickup, ex.language, () => currentLocation(here), here),
+    resolveOrDefault(ex.dropoff, ex.language, () => null, here),
   ])
   for (const [side, q, r] of [['pickup', ex.pickup, pickupRes], ['dropoff', ex.dropoff, dropoffRes]] as const) {
     if (q && r?.kind === 'not_found') console.warn(`[parse-ride] ${side} «${q.name}» not found at any level`)
@@ -117,7 +130,7 @@ parseRideRouter.post('/parse-ride', upload.single('audio'), async (req, res) => 
   // nobody books a ride to where they already are, so the pickup becomes the rider's location.
   if (pickup && dropoff && pickup.source !== 'current' && (pickup.name === dropoff.name || straightLineKm(pickup, dropoff) < 0.03)) {
     console.warn(`[parse-ride] pickup «${pickup.name}» is the dropoff — using the current location`)
-    pickup = currentLocation()
+    pickup = currentLocation(here)
   }
 
   // 4. Ambiguous → the options for one field (dropoff first), no fare yet: two similar places, or up

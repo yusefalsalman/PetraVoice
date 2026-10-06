@@ -93,7 +93,7 @@ Set "language" to the language the rider mostly used ("ar" or "en"). Write each 
 - Arabic pickup cues: «من»، «انا عند»، «انا في»، «انا بـ»، «موجود عند». Dropoff cues: «على»، «ع»، «لـ» («لمستشفى»)، «إلى»، «لعند»، «بدي اروح»، «وصلني على»، «روّحني».
 - English pickup cues: "from", "pick me up (from/at)", "I'm (currently) at", "I'm near". Dropoff cues: "to", "drop me (off) at", "heading to/towards", "take me to", "going to".
 - Order doesn't matter: "To Airport from 8th circle" → pickup 8th Circle, dropoff Airport.
-- Rider at their current location («هون»، «موقعي»، "here", "my location") or no start given → pickup.name = "". Never invent a place that wasn't said.
+- Rider at their current location («هون»، «موقعي»، «من بيتي»، «من البيت»، «من عندي»، "here", "my location", "my house", "home") or no start given → pickup.name = "". Never invent a place that wasn't said.
 - Ignore fillers and chit-chat in both languages: «يا غالي»، «الله يخليك»، «بسرعة»، «لو سمحت»، "please hurry", "hey man", "bro", "thanks".
 
 2) CLEAN NAME vs GATE
