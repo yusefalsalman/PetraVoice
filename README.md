@@ -224,6 +224,29 @@ fare is priced per tier → the app shows everything, **reads it back aloud**, a
 
 <br />
 
+## ☁️ Development deployment
+
+The React frontend is deployed to Vercel (project `petravoice`, root directory
+`frontend`) and the Express API to Render (`https://petravoice-api.onrender.com`).
+Both services track the GitHub repository's `main` branch with automatic deployment.
+
+`frontend/vercel.json` forwards `/api/*` to Render, including audio uploads and TTS.
+Keep `VITE_API_BASE=/api` (or leave it unset); local development continues to use
+the Vite proxy. Store AI provider keys only in Render's environment variables.
+
+Render uses Node.js `24.13.1`, build command
+`cd backend && npm ci && npm run typecheck`, and start command
+`cd backend && npm start`. Set `NODE_ENV=production` and `NPM_CONFIG_INCLUDE=dev`
+so the build installs the TypeScript compiler and type definitions. The existing
+`/api/health` endpoint reports the active speech and AI providers.
+
+This is a **free development deployment**: SQLite stays at
+`backend/data/petravoice.db` on Render's ephemeral filesystem. Bookings and geocode
+cache can be lost on restart or redeployment; landmark data is seeded on startup.
+The free service can also sleep when idle, so its first request can be slow.
+Use a paid persistent disk with `DB_PATH` beneath its mount path if durable
+bookings are needed later.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
